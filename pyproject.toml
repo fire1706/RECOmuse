@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "recomuse"
+version = "0.1.0"
+description = "Conversion de partitions PDF ou images en partitions numériques éditables (MusicXML, MuseScore, MIDI)."
+readme = "README.md"
+license = { text = "AGPL-3.0-or-later" }
+requires-python = ">=3.12,<3.13"
+authors = [{ name = "Fanfare Royale d'Acoz" }]
+dependencies = [
+    "pywebview>=5.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+recomuse = "recomuse.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+# Le schéma SQL est un fichier de données livré avec le paquet.
+"recomuse.storage" = ["*.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

@@ -1,0 +1,25 @@
+{
+  "app": {
+    "title": "RECOmuse",
+    "tagline": "Your paper scores, as digital scores."
+  },
+  "status": {
+    "connecting": "Connecting to the engine…",
+    "connected": "Engine ready (version {{version}}, Python {{python}})",
+    "corrections_one": "{{count}} correction remembered",
+    "corrections_other": "{{count}} corrections remembered",
+    "corrections_zero": "No corrections remembered yet",
+    "noBridge": "Engine unavailable: the interface is open outside the RECOmuse window."
+  },
+  "panels": {
+    "scan": "Original score",
+    "scanEmpty": "Import a PDF score or an image to get started.",
+    "questions": "Questions",
+    "questionsEmpty": "No questions yet.",
+    "result": "Recognised score",
+    "resultEmpty": "The result will appear here."
+  },
+  "language": {
+    "label": "Language"
+  }
+}

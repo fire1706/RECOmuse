@@ -1,0 +1,78 @@
+# ------------------------------------------------------------------
+# Partitions : protégées par le droit d'auteur, JAMAIS dans Git
+# ------------------------------------------------------------------
+# Corpus de test local
+tests/corpus/
+test/corpus/
+
+# Tout PDF, image, MusicXML compressé et projet Audiveris, où qu'ils soient
+*.pdf
+*.PDF
+*.png
+*.PNG
+*.jpg
+*.JPG
+*.jpeg
+*.JPEG
+*.tif
+*.TIF
+*.tiff
+*.TIFF
+*.bmp
+*.BMP
+*.gif
+*.GIF
+*.webp
+*.WEBP
+*.mxl
+*.MXL
+*.omr
+*.OMR
+# MusicXML non compressé et MuseScore : peuvent aussi contenir une partition
+*.musicxml
+*.mscz
+*.mid
+*.midi
+
+# Exception : icônes et images propres à l'interface (créées par le projet)
+!ui/public/icons/*.png
+!ui/src/assets/*.png
+
+# ------------------------------------------------------------------
+# Données locales de l'utilisateur (base SQLite, extraits d'images)
+# ------------------------------------------------------------------
+*.sqlite
+*.sqlite3
+*.db
+data/
+
+# ------------------------------------------------------------------
+# Python
+# ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# ------------------------------------------------------------------
+# Node / interface
+# ------------------------------------------------------------------
+node_modules/
+ui/dist/
+*.tsbuildinfo
+coverage/
+
+# ------------------------------------------------------------------
+# Éditeurs et systèmes
+# ------------------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

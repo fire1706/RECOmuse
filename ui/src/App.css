@@ -1,0 +1,83 @@
+/* Mise en page de l'écran principal : en-tête, trois colonnes, barre d'état. */
+
+:root {
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  color: #1f2328;
+  background: #f6f7f9;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  background: #1d3557;
+  color: #fff;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.tagline {
+  margin: 0.15rem 0 0;
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.language-picker {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+/* Trois colonnes : scan (gauche), questions (centre, plus étroite), résultat (droite). */
+.panels {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  min-height: 0;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 1rem;
+  overflow: auto;
+}
+
+.panel h2 {
+  margin-top: 0;
+  font-size: 1.05rem;
+}
+
+.panel-questions {
+  background: #fffdf5;
+}
+
+.empty {
+  color: #656d76;
+}
+
+.status-bar {
+  padding: 0.4rem 1.25rem;
+  font-size: 0.85rem;
+  color: #656d76;
+  border-top: 1px solid #d0d7de;
+  background: #fff;
+}

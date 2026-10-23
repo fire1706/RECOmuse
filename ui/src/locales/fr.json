@@ -1,0 +1,25 @@
+{
+  "app": {
+    "title": "RECOmuse",
+    "tagline": "Vos partitions papier, en partitions numériques."
+  },
+  "status": {
+    "connecting": "Connexion au moteur…",
+    "connected": "Moteur prêt (version {{version}}, Python {{python}})",
+    "corrections_one": "{{count}} correction mémorisée",
+    "corrections_other": "{{count}} corrections mémorisées",
+    "corrections_zero": "Aucune correction mémorisée pour l'instant",
+    "noBridge": "Moteur indisponible : l'interface est ouverte hors de la fenêtre RECOmuse."
+  },
+  "panels": {
+    "scan": "Partition d'origine",
+    "scanEmpty": "Importez une partition PDF ou une image pour commencer.",
+    "questions": "Questions",
+    "questionsEmpty": "Aucune question pour l'instant.",
+    "result": "Partition reconnue",
+    "resultEmpty": "Le résultat s'affichera ici."
+  },
+  "language": {
+    "label": "Langue"
+  }
+}
