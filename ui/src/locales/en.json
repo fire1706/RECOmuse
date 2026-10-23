@@ -15,11 +15,84 @@
     "scan": "Original score",
     "scanEmpty": "Import a PDF score or an image to get started.",
     "questions": "Questions",
-    "questionsEmpty": "No questions yet.",
-    "result": "Recognised score",
+    "questionsEmpty": "Open a score, or pick one from the list.",
+    "result": "Recognized score",
     "resultEmpty": "The result will appear here."
   },
   "language": {
     "label": "Language"
+  },
+  "open": {
+    "button": "Open a score…",
+    "filter": "Scores (PDF or image)",
+    "stage": {
+      "import": "Preparing the pages…",
+      "recognition": "Reading the score… This can take a minute or two per scanned page.",
+      "model": "Putting the score in order…",
+      "done": "Reading finished."
+    }
+  },
+  "scores": {
+    "label": "Score",
+    "choose": "Choose…",
+    "item_one": "{{name}} ({{count}} bar)",
+    "item_other": "{{name}} ({{count}} bars)",
+    "untitled": "Untitled"
+  },
+  "questions": {
+    "loading": "Looking for doubtful spots…",
+    "remaining_one": "{{count}} question left",
+    "remaining_other": "{{count}} questions left",
+    "answered_one": "{{count}} answer given",
+    "answered_other": "{{count}} answers given",
+    "where": "Bar {{measure}}, page {{page}}",
+    "imageAlt": "Excerpt of the score, with the doubtful spot circled",
+    "grouped": "Your answer will apply to all {{count}} places concerned.",
+    "skip": "Skip (ask again later)",
+    "undo": "Undo my last answer",
+    "validate": "OK",
+    "done": "All questions have been answered. Thank you!",
+    "unasked_one": "{{count}} spot still needs checking by eye: this will be possible in the side-by-side view.",
+    "unasked_other": "{{count}} spots still need checking by eye: this will be possible in the side-by-side view.",
+    "text": {
+      "clef_octave_suspicious": "The clef was read with a small 8 (an \"octave\" clef). If that 8 is not there, all {{notes}} notes of the part are an octave too low. What do you see on the clef?",
+      "note_position_mismatch": "What is the circled note?",
+      "note_out_of_range_high": "{{count}} notes seem too high for this instrument ({{notes}}…). Were they read an octave too high?",
+      "note_out_of_range_low": "{{count}} notes seem too low for this instrument ({{notes}}…). Were they read an octave too low?",
+      "time_signature_missed": "From here on, {{measures}} bars do not match the time signature. Does the time signature change to {{time}}?",
+      "time_signature_missing": "No time signature was read at the start of the part. The bars seem to be in {{time}}. Is that the time signature?",
+      "multirest_missed": "This rest was read as a single bar. Is it a {{count}}-bar rest?",
+      "multirest_missed_no_count": "This rest was read as a single bar. Is it a rest of several bars?",
+      "multirest_count_unknown": "The number of bars of this rest could not be read. How many bars does it last?",
+      "measure_number_mismatch": "According to the printed bar numbers ({{printed_before}}, then {{printed_after}}), some bars are missing. Is this rest a {{count}}-bar rest?"
+    },
+    "choices": {
+      "clef_plain": "A normal clef, without an 8",
+      "clef_octave": "There is a small 8",
+      "note": "{{note}}",
+      "octave_down": "Yes, one octave lower",
+      "octave_up": "Yes, one octave higher",
+      "notes_correct": "No, they are right",
+      "time_is": "Yes, {{time}}",
+      "time_unchanged": "No, the time signature does not change",
+      "rest_measures": "Yes, {{count}} bars",
+      "rest_other_count": "Number of bars:",
+      "rest_one_measure": "No, a single bar"
+    }
+  },
+  "errors": {
+    "unexpected": "An unexpected error occurred. Try again; if it happens again, please report it.",
+    "busy": "A score is already being read.",
+    "question_failed": "This answer could not be saved.",
+    "file_not_found": "The file cannot be found.",
+    "unsupported_format": "This type of file is not supported (PDF or image only).",
+    "unreadable_file": "The file is damaged or unreadable.",
+    "encrypted_pdf": "This PDF is protected by a password.",
+    "empty_document": "The file contains no pages.",
+    "audiveris_not_found": "Audiveris cannot be found: it must be installed to read scanned scores.",
+    "tesseract_not_found": "Tesseract cannot be found: texts cannot be read.",
+    "audiveris_failed": "Audiveris could not read this score.",
+    "audiveris_timeout": "Reading with Audiveris took too long.",
+    "no_music_recognized": "No music was found in this file."
   }
 }

@@ -13,7 +13,7 @@ def octave_down_model():
     clef = treble("c", octave_change=-1, confidence=0.3)
     return model_of([measure("m1", [note("n1", "B", 3), note("n2", "C", 3), note("n3", "D", 4),
                                     note("n4", "E", 4)], [clef, four_four()]),
-                     measure("m2", [note("n5", "F", 4)] * 1, expected="1")],
+                     measure("m2", [note("n5", "F", 4, "4")])],
                     name="Alto Saxophone")
 
 

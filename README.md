@@ -21,6 +21,8 @@ npm run build
 
 Lancer le logiciel : `.venv\Scripts\python -m recomuse`
 (ajouter `--dev` avec `npm run dev` lancé dans `ui/` pour le rechargement automatique).
+« Ouvrir une partition… » lit le fichier (un PDF peut contenir plusieurs parties : une
+partition par partie), puis la zone du centre pose les questions une à une.
 
 Tests : `.venv\Scripts\python -m pytest` à la racine, `npm test` dans `ui/`.
 Tests lents, sur demande : `-m corpus` (vraies partitions de `tests/corpus/` ou `test/corpus/`)

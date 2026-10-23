@@ -13,7 +13,7 @@ from pathlib import Path
 from recomuse import paths
 
 # Version du schéma que ce code sait utiliser.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Migrations à appliquer après schema.sql, dans l'ordre.
 # Chaque élément est (version atteinte, script SQL).
@@ -27,6 +27,24 @@ MIGRATIONS: list[tuple[int, str]] = [
             model_json  TEXT    NOT NULL CHECK (json_valid(model_json)),
             updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
         );
+    """),
+    # Version 3 (tâche 8) : réponses aux questions guidées. Une question à laquelle on a
+    # répondu n'est plus posée, même si la réponse était « c'est juste, ne rien changer »
+    # (cette réponse-là ne crée aucune correction). Une réponse annulée reste dans la
+    # table, marquée « undone », pour garder l'histoire des réponses.
+    (3, """
+        CREATE TABLE question_answers (
+            id              INTEGER PRIMARY KEY,
+            score_id        INTEGER NOT NULL REFERENCES scores(id),
+            question_key    TEXT    NOT NULL,   -- identifiant stable de la question
+            code            TEXT    NOT NULL,   -- type de doute (ex. multirest_missed)
+            choice_id       TEXT    NOT NULL,   -- choix de l'utilisateur
+            value           TEXT    CHECK (value IS NULL OR json_valid(value)),
+            correction_ids  TEXT    NOT NULL CHECK (json_valid(correction_ids)),
+            answered_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            undone          INTEGER NOT NULL DEFAULT 0 CHECK (undone IN (0, 1))
+        );
+        CREATE INDEX idx_question_answers_score ON question_answers(score_id);
     """),
 ]
 

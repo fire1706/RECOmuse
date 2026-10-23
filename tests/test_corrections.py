@@ -139,3 +139,90 @@ def test_missing_model_or_symbol(service, score_id, stored):
 def test_revert_source_is_reserved(service, score_id, stored):
     with pytest.raises(ValueError):
         service.apply(score_id, "n1", {"octave": 6}, source="revert")
+
+
+@pytest.fixture
+def two_measures(conn, score_id, page_image):
+    """Deux mesures en 4/4 : la 1re est un silence qui était en fait une pause de 8."""
+    rest = Symbol(id="r1", kind="rest", page=1, value={"duration": "4", "full_measure": True})
+    time = Symbol(id="t1", kind="time", page=1, value={"beats": 4, "beat_type": 4})
+    clef = Symbol(id="c1", kind="clef", page=1, value={"sign": "G", "line": 2})
+    model = ScoreModel(parts=[Part(id="P1", measures=[
+        Measure(id="m1", number=1, page=1, bbox=(100.0, 200.0, 300.0, 120.0),
+                attributes=[clef, time], events=[rest], expected_duration="4"),
+        Measure(id="m2", number=2, page=1, expected_duration="4")])],
+        pages=[PageInfo(1, str(page_image), 800, 1000)])
+    save_model(conn, score_id, model)
+    return model
+
+
+def test_added_symbol_is_journaled_and_numbering_follows(conn, service, score_id, two_measures):
+    from recomuse.learning.corrections import NewSymbol
+
+    ids = service.apply_group(score_id, [], source="question", reason="multirest_missed",
+                              additions=[NewSymbol("m1", "multirest", {"count": 8})])
+    model = load_model(conn, score_id)
+    first, second = model.parts[0].measures
+    assert [s.kind for s in first.attributes] == ["clef", "time", "multirest"]
+    added = first.attributes[2]
+    assert added.id == "m1.multirest+0" and added.source == "user"
+    assert added.bbox == (100.0, 200.0, 120.0, 120.0)     # début de la mesure
+    assert second.number == 9                             # la pause compte 8 mesures
+    entry = CorrectionJournal(conn).get(ids[0])
+    assert entry.old_value is None and entry.new_value == {"count": 8}
+    assert entry.symbol_kind == "multirest" and entry.snippet_path is not None
+
+
+def test_added_time_signature_changes_the_expected_durations(conn, service, score_id,
+                                                             two_measures):
+    from recomuse.learning.corrections import NewSymbol
+
+    service.apply_group(score_id, [], source="question",
+                        additions=[NewSymbol("m2", "time", {"beats": 3, "beat_type": 4})])
+    first, second = load_model(conn, score_id).parts[0].measures
+    assert [s.kind for s in second.attributes] == ["time"]
+    assert (first.expected_duration, second.expected_duration) == ("4", "3")
+
+
+def test_reverting_an_addition_removes_the_symbol(conn, service, score_id, two_measures):
+    from recomuse.learning.corrections import NewSymbol
+
+    ids = service.apply_group(score_id, [("t1", {"beats": 2})], source="question",
+                              additions=[NewSymbol("m1", "multirest", {"count": 8})])
+    service.revert_all(ids)
+    first, second = load_model(conn, score_id).parts[0].measures
+    assert [s.kind for s in first.attributes] == ["clef", "time"]
+    assert first.attributes[1].value["beats"] == 4
+    assert second.number == 2
+    assert CorrectionJournal(conn).count() == 4           # 2 corrections, 2 annulations
+
+
+def test_impossible_additions_are_refused(conn, service, score_id, two_measures):
+    from recomuse.learning.corrections import NewSymbol
+
+    for addition in [NewSymbol("absente", "multirest", {"count": 2}),
+                     NewSymbol("m1", "time", {"beats": 3, "beat_type": 4}),   # déjà un chiffrage
+                     NewSymbol("m1", "note", {"step": "C"}),
+                     NewSymbol("m1", "multirest", {"nombre": 2})]:
+        with pytest.raises(CorrectionError):
+            service.apply_group(score_id, [], source="question", additions=[addition])
+    with pytest.raises(CorrectionError):        # deux pauses dans la même réponse
+        service.apply_group(score_id, [], source="question",
+                            additions=[NewSymbol("m2", "multirest", {"count": 2})] * 2)
+    assert CorrectionJournal(conn).count() == 0
+
+
+def test_revert_restores_confidence_and_origin(conn, service, score_id, stored):
+    """Après annulation, la note redevient « lue par Audiveris, peu sûre » : le validateur
+    la vérifie de nouveau."""
+    model = load_model(conn, score_id)
+    model.pages[0].source = "audiveris"
+    save_model(conn, score_id, model)
+    first = service.apply(score_id, "n1", {"octave": 6}, source="question")
+    second = service.apply(score_id, "n1", {"alter": 1}, source="manual")
+    service.revert(second)
+    note = load_model(conn, score_id).find("n1")[2]
+    assert (note.source, note.value["alter"]) == ("user", 0)   # la 1re correction tient
+    service.revert(first)
+    note = load_model(conn, score_id).find("n1")[2]
+    assert (note.source, note.confidence, note.value["octave"]) == ("audiveris", 0.4, 5)

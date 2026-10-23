@@ -13,10 +13,81 @@ export interface AppInfo {
   correction_count: number
 }
 
-/** Méthodes Python accessibles depuis l'interface (à compléter au fil des tâches). */
+/** Une partition lue (une partie d'un fichier). */
+export interface ScoreSummary {
+  score_id: number
+  title: string | null
+  instrument: string | null
+  source_name: string | null
+  pages: number[]
+  measure_count: number
+}
+
+/** Une réponse possible à une question. */
+export interface Choice {
+  id: string
+  /** Étiquette traduite : questions.choices.<label>. */
+  label: string
+  params: Record<string, unknown>
+  /** « count » : l'utilisateur tape un nombre de mesures. */
+  input: string | null
+}
+
+/** Une question posée au musicien (voir src/recomuse/questions/questions.py). */
+export interface Question {
+  key: string
+  /** Type de doute : questions.text.<code>. */
+  code: string
+  part_id: string
+  measure_numbers: number[]
+  page: number | null
+  params: Record<string, unknown>
+  choices: Choice[]
+  confidence: number
+  /** Nombre de doutes qu'une seule réponse règle. */
+  issue_count: number
+  /** Extrait de la page (data URL PNG), ou null. */
+  image: string | null
+}
+
+/** Questions encore à poser pour une partition. */
+export interface QuestionsState {
+  score_id: number
+  questions: Question[]
+  /** Points sans question (à revoir dans la vue côte à côte). */
+  unasked: number
+  answered: number
+  can_undo: boolean
+}
+
+/** Erreur renvoyée par le moteur : un code traduit par errors.<code>. */
+export interface EngineError {
+  error: string
+}
+
+export type OpenResult = { scores: ScoreSummary[] } | EngineError
+
+/** Méthodes Python accessibles depuis l'interface. */
 export interface PythonApi {
   ping(): Promise<string>
   get_app_info(): Promise<AppInfo>
+  choose_file(filterLabel: string): Promise<string | null>
+  open_file(path: string): Promise<OpenResult>
+  get_progress(): Promise<{ stage: string | null }>
+  list_scores(): Promise<ScoreSummary[]>
+  get_questions(scoreId: number): Promise<QuestionsState | EngineError>
+  answer_question(
+    scoreId: number,
+    key: string,
+    choiceId: string,
+    value: number | null,
+  ): Promise<QuestionsState | EngineError>
+  undo_answer(scoreId: number): Promise<QuestionsState | EngineError>
+}
+
+/** Vrai si la réponse du moteur est une erreur. */
+export function isError(value: unknown): value is EngineError {
+  return typeof value === 'object' && value !== null && 'error' in value
 }
 
 declare global {

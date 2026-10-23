@@ -70,7 +70,7 @@ def main(argv: list[str] | None = None) -> None:
     api = Api(conn, str(db_path))
 
     url, html = resolve_ui_entry(args.dev)
-    webview.create_window(
+    window = webview.create_window(
         WINDOW_TITLE,
         url=url,
         html=html,
@@ -79,6 +79,7 @@ def main(argv: list[str] | None = None) -> None:
         height=900,
         min_size=(900, 600),
     )
+    api._window = window   # pour la fenêtre « Ouvrir » (Api.choose_file)
     try:
         # Bloque jusqu'à la fermeture de la fenêtre.
         # Pour un fichier local, pywebview le sert lui-même depuis 127.0.0.1 (fichiers

@@ -15,11 +15,84 @@
     "scan": "Partition d'origine",
     "scanEmpty": "Importez une partition PDF ou une image pour commencer.",
     "questions": "Questions",
-    "questionsEmpty": "Aucune question pour l'instant.",
+    "questionsEmpty": "Ouvrez une partition, ou choisissez-en une dans la liste.",
     "result": "Partition reconnue",
     "resultEmpty": "Le résultat s'affichera ici."
   },
   "language": {
     "label": "Langue"
+  },
+  "open": {
+    "button": "Ouvrir une partition…",
+    "filter": "Partitions (PDF ou image)",
+    "stage": {
+      "import": "Préparation des pages…",
+      "recognition": "Lecture de la partition… Cela peut prendre une ou deux minutes par page scannée.",
+      "model": "Mise en ordre de la partition…",
+      "done": "Lecture terminée."
+    }
+  },
+  "scores": {
+    "label": "Partition",
+    "choose": "Choisir…",
+    "item_one": "{{name}} ({{count}} mesure)",
+    "item_other": "{{name}} ({{count}} mesures)",
+    "untitled": "Sans titre"
+  },
+  "questions": {
+    "loading": "Recherche des doutes…",
+    "remaining_one": "{{count}} question restante",
+    "remaining_other": "{{count}} questions restantes",
+    "answered_one": "{{count}} réponse donnée",
+    "answered_other": "{{count}} réponses données",
+    "where": "Mesure {{measure}}, page {{page}}",
+    "imageAlt": "Extrait de la partition, le passage douteux entouré",
+    "grouped": "Votre réponse vaudra pour les {{count}} endroits concernés.",
+    "skip": "Passer (reposer plus tard)",
+    "undo": "Annuler ma dernière réponse",
+    "validate": "Valider",
+    "done": "Toutes les questions ont une réponse. Merci !",
+    "unasked_one": "{{count}} passage reste à vérifier à l'œil : il pourra l'être dans la vue côte à côte.",
+    "unasked_other": "{{count}} passages restent à vérifier à l'œil : ils pourront l'être dans la vue côte à côte.",
+    "text": {
+      "clef_octave_suspicious": "La clé a été lue avec un petit 8 (clé « octaviée »). Si ce 8 n'y est pas, les {{notes}} notes de la partie sont toutes une octave trop basses. Que voyez-vous sur la clé ?",
+      "note_position_mismatch": "Quelle est la note entourée ?",
+      "note_out_of_range_high": "{{count}} notes semblent trop aiguës pour cet instrument ({{notes}}…). Ont-elles été lues une octave trop haut ?",
+      "note_out_of_range_low": "{{count}} notes semblent trop graves pour cet instrument ({{notes}}…). Ont-elles été lues une octave trop bas ?",
+      "time_signature_missed": "À partir d'ici, {{measures}} mesures ne correspondent pas au chiffrage. Le chiffrage passe-t-il à {{time}} ?",
+      "time_signature_missing": "Aucun chiffrage n'a été lu au début de la partie. Les mesures semblent être à {{time}}. Est-ce bien le chiffrage ?",
+      "multirest_missed": "Ce silence a été lu comme une seule mesure. Est-ce une pause de {{count}} mesures ?",
+      "multirest_missed_no_count": "Ce silence a été lu comme une seule mesure. Est-ce une pause de plusieurs mesures ?",
+      "multirest_count_unknown": "Le nombre de mesures de cette pause n'a pas pu être lu. Combien de mesures dure-t-elle ?",
+      "measure_number_mismatch": "D'après les numéros de mesure imprimés ({{printed_before}}, puis {{printed_after}}), il manque des mesures. Ce silence est-il une pause de {{count}} mesures ?"
+    },
+    "choices": {
+      "clef_plain": "Une clé normale, sans 8",
+      "clef_octave": "Il y a bien un petit 8",
+      "note": "{{note}}",
+      "octave_down": "Oui, une octave plus bas",
+      "octave_up": "Oui, une octave plus haut",
+      "notes_correct": "Non, elles sont justes",
+      "time_is": "Oui, {{time}}",
+      "time_unchanged": "Non, le chiffrage ne change pas",
+      "rest_measures": "Oui, {{count}} mesures",
+      "rest_other_count": "Nombre de mesures :",
+      "rest_one_measure": "Non, une seule mesure"
+    }
+  },
+  "errors": {
+    "unexpected": "Une erreur inattendue s'est produite. Réessayez ; si elle revient, signalez-la.",
+    "busy": "Une partition est déjà en cours de lecture.",
+    "question_failed": "Cette réponse n'a pas pu être enregistrée.",
+    "file_not_found": "Le fichier est introuvable.",
+    "unsupported_format": "Ce type de fichier n'est pas pris en charge (PDF ou image seulement).",
+    "unreadable_file": "Le fichier est abîmé ou illisible.",
+    "encrypted_pdf": "Ce PDF est protégé par un mot de passe.",
+    "empty_document": "Le fichier ne contient aucune page.",
+    "audiveris_not_found": "Audiveris est introuvable : il faut l'installer pour lire les partitions scannées.",
+    "tesseract_not_found": "Tesseract est introuvable : les textes ne peuvent pas être lus.",
+    "audiveris_failed": "Audiveris n'a pas réussi à lire cette partition.",
+    "audiveris_timeout": "La lecture par Audiveris a pris trop de temps.",
+    "no_music_recognized": "Aucune musique n'a été trouvée dans ce fichier."
   }
 }

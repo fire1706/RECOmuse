@@ -153,6 +153,14 @@ class ScoreModel:
                         return part, measure, symbol
         raise KeyError(symbol_id)
 
+    def find_measure(self, measure_id: str) -> tuple[Part, Measure]:
+        """Retrouve une mesure par son identifiant. Lève KeyError si elle n'existe pas."""
+        for part in self.parts:
+            for measure in part.measures:
+                if measure.id == measure_id:
+                    return part, measure
+        raise KeyError(measure_id)
+
     def page(self, number: int) -> PageInfo | None:
         return next((p for p in self.pages if p.number == number), None)
 
@@ -163,6 +171,21 @@ class ScoreModel:
             for measure in part.measures:
                 measure.number = number
                 number += measure.length
+
+    def refresh(self) -> None:
+        """Remet à jour ce qui découle des symboles après une correction : numéros des
+        mesures (une pause multiple compte pour plusieurs) et durée attendue de chaque
+        mesure d'après le chiffrage en vigueur (un chiffrage ajouté ou corrigé vaut pour
+        toutes les mesures qui le suivent, jusqu'au chiffrage suivant)."""
+        self.renumber()
+        for part in self.parts:
+            current: Fraction | None = None
+            for measure in part.measures:
+                time = next((s for s in measure.attributes if s.kind == "time"), None)
+                if time is not None:
+                    current = Fraction(4 * time.value["beats"], time.value["beat_type"])
+                if current is not None:
+                    measure.expected_duration = fraction_text(current)
 
     # --- Enregistrement (JSON) -------------------------------------------------------------
 

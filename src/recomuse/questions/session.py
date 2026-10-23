@@ -1,0 +1,160 @@
+"""Déroulement des questions d'une partition : les poser, enregistrer les réponses, annuler.
+
+À chaque demande, la partition est revalidée et les questions recalculées : une réponse
+peut en faire disparaître d'autres (corriger une pause multiple règle aussi le saut des
+numéros de mesure qui la suivent). Les questions déjà répondues ne sont plus posées,
+même si la réponse était « c'est juste » (table question_answers).
+
+Toutes les corrections passent par le service de corrections (learning/corrections.py).
+Les règles apprises (tâche 12) seront consultées ici avant de poser une question.
+"""
+
+import json
+import sqlite3
+from pathlib import Path
+from typing import Any
+
+from recomuse import paths
+from recomuse.learning.corrections import CorrectionService
+from recomuse.model.score import ScoreModel
+from recomuse.model.store import load_model
+from recomuse.questions.images import question_image
+from recomuse.questions.questions import Question, build_questions
+from recomuse.validation.geometry import PageGeometries
+from recomuse.validation.validator import tesseract_number_reader, validate
+
+
+class QuestionError(RuntimeError):
+    """Question ou réponse impossible (partition inconnue, question déjà répondue...)."""
+
+
+class QuestionSession:
+    """Questions des partitions ouvertes dans le logiciel."""
+
+    def __init__(self, conn: sqlite3.Connection, service: CorrectionService | None = None,
+                 work_dir: Path | None = None) -> None:
+        self._conn = conn
+        self._service = service or CorrectionService(conn)
+        self._work_dir = work_dir
+        # Images des pages et portées retrouvées : gardées pour la partition en cours
+        # seulement (une page à 300 dpi pèse une dizaine de mégaoctets).
+        self._geometries: tuple[int, PageGeometries] | None = None
+        self._read_number = None
+        self._current: dict[int, dict[str, Question]] = {}
+
+    # --- Demandes de l'interface ------------------------------------------------------------
+
+    def state(self, score_id: int) -> dict:
+        """Questions encore à poser, dans l'ordre, avec leur image."""
+        model = self._model(score_id)
+        questions, unasked = self._questions(score_id, model)
+        geometries = self._page_images(score_id)
+        listed = []
+        for question in questions:
+            data = question.to_dict()
+            data["image"] = self._image(model, question, geometries)
+            listed.append(data)
+        return {"score_id": score_id, "questions": listed, "unasked": unasked,
+                "answered": self._answer_count(score_id),
+                "can_undo": self._last_answer(score_id) is not None}
+
+    def answer(self, score_id: int, key: str, choice_id: str, value: Any = None) -> dict:
+        """Enregistre la réponse à une question et applique les corrections qu'elle
+        implique. Renvoie le nouvel état des questions."""
+        question = self._current.get(score_id, {}).get(key)
+        if question is None:
+            self._questions(score_id, self._model(score_id))
+            question = self._current.get(score_id, {}).get(key)
+        if question is None:
+            raise QuestionError(f"Question inconnue ou déjà répondue : {key}")
+        try:
+            choice = question.choice(choice_id)
+            fixes, additions = choice.changes(value)
+        except (KeyError, ValueError) as error:
+            raise QuestionError(f"Réponse impossible : {error}") from None
+
+        ids: list[int] = []
+        if fixes or additions:
+            ids = self._service.apply_group(
+                score_id, [(f.symbol_id, f.value) for f in fixes], source="question",
+                reason=question.code, additions=additions)
+        with self._conn:
+            self._conn.execute(
+                "INSERT INTO question_answers (score_id, question_key, code, choice_id, value,"
+                " correction_ids) VALUES (?, ?, ?, ?, ?, ?)",
+                (score_id, key, question.code, choice_id,
+                 json.dumps(value) if value is not None else None, json.dumps(ids)))
+        return self.state(score_id)
+
+    def undo(self, score_id: int) -> dict:
+        """Annule la dernière réponse : ses corrections sont annulées (dans le journal) et
+        la question sera reposée."""
+        last = self._last_answer(score_id)
+        if last is None:
+            raise QuestionError("Aucune réponse à annuler.")
+        answer_id, correction_ids = last
+        if correction_ids:
+            self._service.revert_all(correction_ids)
+        with self._conn:
+            self._conn.execute("UPDATE question_answers SET undone = 1 WHERE id = ?",
+                               (answer_id,))
+        return self.state(score_id)
+
+    # --- Interne ----------------------------------------------------------------------------
+
+    def _model(self, score_id: int) -> ScoreModel:
+        model = load_model(self._conn, score_id)
+        if model is None:
+            raise QuestionError(f"Aucune partition lue sous le n° {score_id}.")
+        return model
+
+    def _questions(self, score_id: int, model: ScoreModel) -> tuple[list[Question], int]:
+        report = validate(model, read_number=self._number_reader(),
+                          geometries=self._page_images(score_id))
+        questions, unasked = build_questions(model, report)
+        answered = self._answered_keys(score_id)
+        questions = [q for q in questions if q.key not in answered]
+        self._current[score_id] = {q.key: q for q in questions}
+        return questions, unasked
+
+    def _page_images(self, score_id: int) -> PageGeometries:
+        if self._geometries is None or self._geometries[0] != score_id:
+            self._geometries = (score_id, PageGeometries())
+        return self._geometries[1]
+
+    def _number_reader(self):
+        """Lecture des nombres des pauses multiples par Tesseract (None s'il manque)."""
+        if self._read_number is None:
+            folder = (self._work_dir or paths.imports_dir()) / "validation"
+            self._read_number = tesseract_number_reader(folder) or False
+        return self._read_number or None
+
+    def _image(self, model: ScoreModel, question: Question,
+               geometries: PageGeometries) -> str | None:
+        page = model.page(question.page) if question.page is not None else None
+        if page is None or page.image_path is None or question.region is None:
+            return None
+        if not Path(page.image_path).is_file():
+            return None
+        try:
+            return question_image(geometries.image(page.image_path), question.region,
+                                  question.highlights)
+        except (OSError, ValueError):
+            return None    # la question reste posable, sans image
+
+    def _answered_keys(self, score_id: int) -> set[str]:
+        rows = self._conn.execute(
+            "SELECT question_key FROM question_answers WHERE score_id = ? AND undone = 0",
+            (score_id,))
+        return {row[0] for row in rows}
+
+    def _answer_count(self, score_id: int) -> int:
+        return self._conn.execute(
+            "SELECT COUNT(*) FROM question_answers WHERE score_id = ? AND undone = 0",
+            (score_id,)).fetchone()[0]
+
+    def _last_answer(self, score_id: int) -> tuple[int, list[int]] | None:
+        row = self._conn.execute(
+            "SELECT id, correction_ids FROM question_answers WHERE score_id = ? AND undone = 0"
+            " ORDER BY id DESC LIMIT 1", (score_id,)).fetchone()
+        return (row[0], json.loads(row[1])) if row else None

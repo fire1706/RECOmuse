@@ -78,7 +78,7 @@ def test_load_missing_model(conn, score_id):
 
 
 def test_database_version_1_is_upgraded(tmp_path):
-    """Une base créée par la tâche 2 (version 1) reçoit la table des modèles."""
+    """Une base créée par la tâche 2 (version 1) reçoit les tables ajoutées depuis."""
     path = tmp_path / "ancienne.sqlite3"
     raw = sqlite3.connect(path)
     raw.executescript(database._read_schema() + "\nPRAGMA user_version = 1;")
@@ -87,7 +87,7 @@ def test_database_version_1_is_upgraded(tmp_path):
     raw.close()
 
     conn = database.connect(path)
-    assert database.schema_version(conn) == database.SCHEMA_VERSION == 2
+    assert database.schema_version(conn) == database.SCHEMA_VERSION == 3
     assert conn.execute("SELECT COUNT(*) FROM scores").fetchone()[0] == 1
     save_model(conn, 1, sample_model())
     conn.close()
