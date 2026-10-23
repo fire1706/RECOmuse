@@ -115,3 +115,27 @@ def test_vector_rhythms_and_numbering(prefix):
     for item in score.part_measures():
         if item.measure.printed_number is not None:
             assert item.measure.printed_number == item.number
+
+
+def test_model_of_a_vector_part_without_audiveris(tmp_path, monkeypatch):
+    """Tâche 5 : une partie vectorielle donne un modèle complet sans lancer Audiveris."""
+    from recomuse.importer import import_score
+    from recomuse.model.build import build_model
+    from recomuse.recognition import recognize_score, tools
+
+    matches = [p for p in corpus_pdfs() if p.name.startswith("throwin_down")]
+    if not matches:
+        pytest.skip("throwin_down absent du corpus")
+    # Même sans Audiveris installé, tout doit fonctionner.
+    status = tools.check_tools()
+    monkeypatch.setattr(tools, "check_tools", lambda: tools.ToolsStatus(
+        audiveris=None, tesseract=None, tessdata=None, languages=[],
+        missing_languages=status.missing_languages))
+    score = import_score(matches[0], tmp_path / "work")
+    score.pages = [p for p in score.pages if p.page_number <= 2]
+    recognition = recognize_score(score)
+    assert recognition.run is None
+    model = build_model(score, recognition)
+    assert sum(m.length for m in model.parts[0].measures) == 109
+    assert all(s.bbox is not None for s in model.symbols())
+    assert model.title == "Throwin' Down" and model.instrument == "Alto Saxophone 1"

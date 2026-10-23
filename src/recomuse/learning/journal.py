@@ -75,8 +75,12 @@ class CorrectionJournal:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
 
-    def record(self, correction: Correction) -> int:
-        """Enregistre une correction et renvoie son numéro dans le journal."""
+    def record(self, correction: Correction, commit: bool = True) -> int:
+        """Enregistre une correction et renvoie son numéro dans le journal.
+
+        commit=False : la correction fait partie d'une transaction ouverte par l'appelant
+        (le service de corrections enregistre le journal et le modèle ensemble).
+        """
         if correction.id is not None:
             raise ValueError("Une correction déjà enregistrée ne peut pas l'être une seconde fois.")
         if correction.source == "revert" and correction.reverts_id is None:
@@ -85,44 +89,49 @@ class CorrectionJournal:
             raise ValueError("Seule une annulation (source « revert ») peut référencer une correction.")
 
         bbox = correction.bbox
-        with self._conn:  # transaction : tout ou rien
-            cursor = self._conn.execute(
-                """
-                INSERT INTO corrections (
-                    score_id, page_number, measure_number, staff_number,
-                    symbol_id, symbol_kind,
-                    bbox_x, bbox_y, bbox_width, bbox_height, snippet_path,
-                    old_value, new_value, confidence, alternatives,
-                    source, group_id, reason, reverts_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    correction.score_id,
-                    correction.page_number,
-                    correction.measure_number,
-                    correction.staff_number,
-                    correction.symbol_id,
-                    correction.symbol_kind,
-                    bbox.x if bbox else None,
-                    bbox.y if bbox else None,
-                    bbox.width if bbox else None,
-                    bbox.height if bbox else None,
-                    correction.snippet_path,
-                    _to_json(correction.old_value),
-                    # new_value est obligatoire : « aucune valeur » (symbole supprimé)
-                    # est stockée comme le JSON null, pas comme une case vide.
-                    json.dumps(correction.new_value, ensure_ascii=False, sort_keys=True),
-                    correction.confidence,
-                    _to_json(correction.alternatives) if correction.alternatives else None,
-                    correction.source,
-                    correction.group_id,
-                    correction.reason,
-                    correction.reverts_id,
-                ),
-            )
+        if commit:
+            with self._conn:  # transaction : tout ou rien
+                return self._insert(correction, bbox)
+        return self._insert(correction, bbox)
+
+    def _insert(self, correction: Correction, bbox: BoundingBox | None) -> int:
+        cursor = self._conn.execute(
+            """
+            INSERT INTO corrections (
+                score_id, page_number, measure_number, staff_number,
+                symbol_id, symbol_kind,
+                bbox_x, bbox_y, bbox_width, bbox_height, snippet_path,
+                old_value, new_value, confidence, alternatives,
+                source, group_id, reason, reverts_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                correction.score_id,
+                correction.page_number,
+                correction.measure_number,
+                correction.staff_number,
+                correction.symbol_id,
+                correction.symbol_kind,
+                bbox.x if bbox else None,
+                bbox.y if bbox else None,
+                bbox.width if bbox else None,
+                bbox.height if bbox else None,
+                correction.snippet_path,
+                _to_json(correction.old_value),
+                # new_value est obligatoire : « aucune valeur » (symbole supprimé)
+                # est stockée comme le JSON null, pas comme une case vide.
+                json.dumps(correction.new_value, ensure_ascii=False, sort_keys=True),
+                correction.confidence,
+                _to_json(correction.alternatives) if correction.alternatives else None,
+                correction.source,
+                correction.group_id,
+                correction.reason,
+                correction.reverts_id,
+            ),
+        )
         return cursor.lastrowid
 
-    def revert(self, correction_id: int) -> int:
+    def revert(self, correction_id: int, commit: bool = True) -> int:
         """Annule une correction en enregistrant la correction inverse.
 
         Renvoie le numéro de la nouvelle ligne du journal.
@@ -147,7 +156,8 @@ class CorrectionJournal:
                 bbox=original.bbox,
                 snippet_path=original.snippet_path,
                 group_id=original.group_id,
-            )
+            ),
+            commit=commit,
         )
 
     def get(self, correction_id: int) -> Correction | None:

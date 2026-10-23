@@ -128,6 +128,7 @@ class Measure:
     notes: list[Note] = field(default_factory=list)
     rests: list[Rest] = field(default_factory=list)
     clef: str | None = None              # clé écrite dans la mesure (début de ligne ou changement)
+    clef_position: int | None = None     # position de son point d'ancrage (2 = 2e ligne)
     key_fifths: int | None = None        # armure écrite dans la mesure
     time_signature: str | None = None    # ex. « 3/4 », écrit dans la mesure
     multirest: int | None = None         # nombre de mesures d'une pause multiple
@@ -369,11 +370,16 @@ def interpret_page(prims: PagePrimitives, page_number: int,
         by_measure.setdefault(id(measure), []).append(glyph)
         staff_of_glyph[id(glyph)] = index
 
-    # Textes : tout ce qui est au-dessus de la première portée forme l'en-tête (titre,
-    # instrument, tempo...). Un texte proche d'une portée est AUSSI rattaché à sa mesure :
-    # le tempo écrit juste au-dessus de la 1re portée appartient aux deux.
-    first_top = min(s.top for s in staves)
-    header_lines = [t for t in prims.texts if t.y1 < first_top]
+    # Textes : tout ce qui est au-dessus du premier système (dans l'ordre de lecture) et dans
+    # sa colonne forme l'en-tête (titre, instrument, tempo...). Sur une feuille à deux pages
+    # côte à côte, le système de droite peut commencer plus haut que le titre de gauche.
+    # Un texte proche d'une portée est AUSSI rattaché à sa mesure : le tempo écrit juste
+    # au-dessus de la 1re portée appartient aux deux.
+    first_system = [staves[i] for i in systems_idx[0]]
+    first_top = min(s.top for s in first_system)
+    column = (min(s.x0 for s in first_system), max(s.x1 for s in first_system))
+    header_lines = [t for t in prims.texts
+                    if t.y1 < first_top and t.x1 > column[0] and t.x0 < column[1]]
     free_texts = []
     for text in prims.texts:
         center_x, center_y = (text.x0 + text.x1) / 2, (text.y0 + text.y1) / 2
@@ -510,8 +516,9 @@ def _interpret_staff(content: StaffContent, state: dict, page: _Page) -> None:
         for g in glyphs:
             if g.symbol and g.symbol.kind == "clef" and -2 <= staff.position(g.y) <= 10:
                 measure.clef = g.symbol.name
+                measure.clef_position = round(staff.position(g.y))
                 state["clef"] = g.symbol.name
-                state["clef_position"] = round(staff.position(g.y))
+                state["clef_position"] = measure.clef_position
                 if number == 0:
                     content.clef, content.clef_position = state["clef"], state["clef_position"]
         if state["clef"] is None:

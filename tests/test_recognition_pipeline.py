@@ -141,12 +141,14 @@ def test_real_tools_on_a_synthetic_part(tmp_path, monkeypatch):
     # Les tests utilisent un dossier de données temporaire : on y indique les vraies langues.
     monkeypatch.setenv("RECOMUSE_TESSDATA", str(real_tools.tessdata))
     score = import_score(part_pdf(Path(tmp_path) / "partie.pdf"), tmp_path / "work")
-    result = recognize_score(score)
+    # Page vectorielle : envoyée quand même à Audiveris, pour comparer les deux lectures.
+    result = recognize_score(score, audiveris_for_vector_pages=True)
 
     assert result.header.title == "MARCHE D'ACOZ"
     assert result.header.instrument == "Flute 1"
     assert result.header.tempo == "Allegro"
     assert result.header.composers == ["arr. J. Dupont"]
-    # 6 systèmes de 4 mesures.
+    # 6 systèmes de 4 mesures, pour Audiveris comme pour la lecture vectorielle.
     assert result.measure_count == 24
+    assert result.vector.measure_count() == 24
     assert result.run.omr_path is not None

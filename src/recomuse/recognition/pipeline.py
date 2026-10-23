@@ -5,8 +5,9 @@ Enchaînement :
    exactes, qui serviront à contrôler Audiveris ;
 2. lecture de l'en-tête de la première page de musique : texte exact du PDF si la page
    est vectorielle, sinon Tesseract (titre, instrument...) ;
-3. passage d'Audiveris sur toutes les pages de musique (un seul livre). Les pages
-   vectorielles y passent aussi tant que leurs durées ne sont pas lues (tâche 4b-2) ;
+3. passage d'Audiveris sur les pages de musique que la lecture vectorielle n'a pas pu
+   lire (un seul livre) : depuis la tâche 4b-2, une page vectorielle lue n'en a plus
+   besoin. S'il ne reste aucune page, Audiveris n'est pas lancé (ni même nécessaire) ;
 4. résumé des fichiers MusicXML produits, et textes d'Audiveris en secours.
 
 Le résultat brut d'Audiveris (MusicXML, projet .omr) sera transformé en modèle interne
@@ -21,6 +22,7 @@ from recomuse.importer import ImportedScore
 from recomuse.recognition import tools
 from recomuse.recognition.audiveris import (
     BOOK_NAME,
+    AudiverisError,
     AudiverisRun,
     ProgressCallback,
     build_book_image,
@@ -51,7 +53,7 @@ AUDIVERIS_DIRNAME = "audiveris"
 class RecognitionResult:
     """Résultat de la reconnaissance d'une partition."""
 
-    run: AudiverisRun
+    run: AudiverisRun | None               # None : toutes les pages ont été lues vectoriellement
     movements: list[MovementSummary]
     header: HeaderInfo
     header_lines: list[OcrLine] = field(default_factory=list)
@@ -64,15 +66,18 @@ class RecognitionResult:
 
     def movement_pages(self, movement: MovementSummary) -> list[int]:
         """Numéros des pages d'origine (et non des feuilles du livre) d'un mouvement."""
+        if self.run is None:
+            return []
         return [self.run.book.sheet_pages[sheet - 1] for sheet in sorted(movement.sheet_systems)]
 
     def to_dict(self) -> dict:
         """Version simple (textes, nombres, listes) pour l'interface ou un fichier JSON."""
+        run = self.run
         return {
-            "sheet_pages": self.run.book.sheet_pages,
-            "omr_path": str(self.run.omr_path) if self.run.omr_path else None,
-            "log_path": str(self.run.log_path) if self.run.log_path else None,
-            "duration_seconds": self.run.duration_seconds,
+            "sheet_pages": run.book.sheet_pages if run else [],
+            "omr_path": str(run.omr_path) if run and run.omr_path else None,
+            "log_path": str(run.log_path) if run and run.log_path else None,
+            "duration_seconds": run.duration_seconds if run else 0.0,
             "measure_count": self.measure_count,
             "movements": [
                 {**asdict(m), "path": str(m.path), "pages": self.movement_pages(m)}
@@ -85,30 +90,35 @@ class RecognitionResult:
 
 
 def recognize_score(score: ImportedScore, on_progress: ProgressCallback | None = None,
-                    output_dir: Path | None = None) -> RecognitionResult:
+                    output_dir: Path | None = None,
+                    audiveris_for_vector_pages: bool = False) -> RecognitionResult:
     """Reconnaît la musique et les textes d'une partition importée (tâche 3).
 
-    Lève ToolNotFoundError si Audiveris est absent, AudiverisError s'il échoue.
+    audiveris_for_vector_pages=True : envoie aussi à Audiveris les pages lues
+    vectoriellement (pour comparer les deux lectures).
+    Lève ToolNotFoundError si Audiveris est nécessaire mais absent, AudiverisError s'il
+    échoue ou s'il n'y a aucune page de musique.
     """
     status = tools.check_tools()
-    audiveris = tools.require(status.audiveris, "audiveris_not_found")
     output_dir = output_dir or score.work_dir / AUDIVERIS_DIRNAME
     warnings: list[RecognitionWarning] = []
     if status.missing_languages:
         warnings.append("ocr_languages_missing")
 
-    # Le livre est construit en premier : s'il n'y a aucune page de musique, inutile
-    # de lire l'en-tête.
-    book = build_book_image(score.pages, output_dir / f"{BOOK_NAME}.tif")
+    # Pages de musique : celles où l'import a trouvé des portées.
+    music_pages = [p for p in score.pages if p.image_path is not None and p.interline is not None]
+    if not music_pages:
+        raise AudiverisError("no_music_recognized", "aucune page avec des portées")
 
     # 1. Lecture vectorielle (rapide : moins d'une seconde par page).
     vector = None
-    vector_pages = [p.page_number for p in score.pages if p.kind == "vector"]
-    if vector_pages and score.source_path.suffix.lower() == ".pdf":
-        vector = read_vector_pdf(score.source_path, vector_pages)
+    pdf_vector_pages = [p.page_number for p in score.pages if p.kind == "vector"]
+    if pdf_vector_pages and score.source_path.suffix.lower() == ".pdf":
+        vector = read_vector_pdf(score.source_path, pdf_vector_pages)
+    read_by_vector = {p.page_number for p in vector.pages if p.systems} if vector else set()
 
     # 2. En-tête de la première page de musique : texte exact du PDF si possible.
-    first_music_page = next(p for p in score.pages if p.page_number == book.sheet_pages[0])
+    first_music_page = music_pages[0]
     header_lines: list[OcrLine] = []
     header = HeaderInfo()
     vector_page = next((p for p in vector.pages if p.page_number == first_music_page.page_number),
@@ -127,13 +137,21 @@ def recognize_score(score: ImportedScore, on_progress: ProgressCallback | None =
     else:
         warnings.append("ocr_unavailable")
 
-    # 3. Audiveris.
-    run = run_audiveris(audiveris, book, output_dir, status.tessdata, on_progress)
-
-    # 4. Résumé de la musique, et textes d'Audiveris pour compléter l'en-tête.
-    movements = [summarize_movement(path) for path in run.movement_paths]
-    if movements:
-        header = complete_with_credits(header, movements[0].credits)
+    # 3. Audiveris, pour les pages que la lecture vectorielle n'a pas lues.
+    for_audiveris = [p for p in music_pages
+                     if audiveris_for_vector_pages or p.page_number not in read_by_vector]
+    run = None
+    movements: list[MovementSummary] = []
+    if for_audiveris:
+        audiveris = tools.require(status.audiveris, "audiveris_not_found")
+        book = build_book_image(for_audiveris, output_dir / f"{BOOK_NAME}.tif")
+        run = run_audiveris(audiveris, book, output_dir, status.tessdata, on_progress)
+        # 4. Résumé de la musique, et textes d'Audiveris pour compléter l'en-tête.
+        movements = [summarize_movement(path) for path in run.movement_paths]
+        if movements:
+            header = complete_with_credits(header, movements[0].credits)
+    elif on_progress:
+        on_progress(1, 1)
 
     return RecognitionResult(run=run, movements=movements, header=header,
                              header_lines=header_lines, warnings=warnings, vector=vector)

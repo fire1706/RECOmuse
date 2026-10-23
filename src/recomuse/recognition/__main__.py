@@ -66,9 +66,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     header = result.header
-    print(f"\nTerminé en {time.perf_counter() - start:.0f} s "
-          f"(Audiveris {result.run.duration_seconds:.0f} s), "
-          f"{len(result.run.book.sheet_pages)} page(s) de musique : {result.run.book.sheet_pages}")
+    if result.run is not None:
+        print(f"\nTerminé en {time.perf_counter() - start:.0f} s "
+              f"(Audiveris {result.run.duration_seconds:.0f} s), pages envoyées à Audiveris : "
+              f"{result.run.book.sheet_pages}")
+    else:
+        print(f"\nTerminé en {time.perf_counter() - start:.0f} s, toutes les pages lues "
+              f"vectoriellement (sans Audiveris)")
     print(f"Titre      : {header.title}")
     print(f"Instrument : {header.instrument}")
     print(f"Tempo      : {header.tempo}")
@@ -88,7 +92,8 @@ def main(argv: list[str] | None = None) -> int:
               f"durées fausses {v.duration_mismatches()}")
     if result.warnings:
         print(f"ATTENTION: {', '.join(result.warnings)}")
-    print(f"-> {result.run.output_dir}")
+    if result.run is not None:
+        print(f"-> {result.run.output_dir}")
     return 0
 
 

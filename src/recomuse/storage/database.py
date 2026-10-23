@@ -13,11 +13,22 @@ from pathlib import Path
 from recomuse import paths
 
 # Version du schéma que ce code sait utiliser.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Migrations à appliquer après schema.sql, dans l'ordre.
-# Chaque élément est (version atteinte, script SQL). Vide pour l'instant.
-MIGRATIONS: list[tuple[int, str]] = []
+# Chaque élément est (version atteinte, script SQL).
+MIGRATIONS: list[tuple[int, str]] = [
+    # Version 2 (tâche 5) : modèle interne de chaque partition, en JSON (model/score.py).
+    # Rangé dans la base, à côté du journal : une correction met à jour les deux dans une
+    # seule transaction (tout ou rien).
+    (2, """
+        CREATE TABLE score_models (
+            score_id    INTEGER PRIMARY KEY REFERENCES scores(id),
+            model_json  TEXT    NOT NULL CHECK (json_valid(model_json)),
+            updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+    """),
+]
 
 
 class DatabaseTooNewError(RuntimeError):
