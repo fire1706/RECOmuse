@@ -87,6 +87,7 @@ class Question:
     part_id: str
     measure_numbers: list[int]
     page: int | None
+    measure_id: str | None                    # mesure concernée (pour la vue côte à côte)
     region: Box | None                        # zone de la page à montrer
     highlights: list[Box]                     # symboles à entourer dans cette zone
     params: dict[str, Any]
@@ -104,16 +105,18 @@ class Question:
         return {
             "key": self.key, "code": self.code, "part_id": self.part_id,
             "measure_numbers": self.measure_numbers, "page": self.page,
+            "measure_id": self.measure_id,
             "params": self.params, "choices": [c.to_dict() for c in self.choices],
             "confidence": self.confidence, "issue_count": self.issue_count,
         }
 
 
-def build_questions(model: ScoreModel, report: ValidationReport) -> tuple[list[Question], int]:
-    """Questions à poser pour ce rapport, dans l'ordre où les poser. Renvoie aussi le
-    nombre de problèmes qui ne deviennent pas des questions (à revoir à la main)."""
+def build_questions(model: ScoreModel,
+                    report: ValidationReport) -> tuple[list[Question], list[Issue]]:
+    """Questions à poser pour ce rapport, dans l'ordre où les poser. Renvoie aussi les
+    problèmes qui ne deviennent pas des questions (passages à vérifier à l'œil)."""
     questions: dict[str, Question] = {}
-    unasked = 0
+    unasked: list[Issue] = []
     out_of_range: dict[tuple[str, str], list[Issue]] = {}
     for issue in report.issues:
         if issue.code == "note_out_of_range" and issue.fixes:
@@ -123,7 +126,7 @@ def build_questions(model: ScoreModel, report: ValidationReport) -> tuple[list[Q
         builder = BUILDERS.get(issue.code)
         question = builder(model, issue) if builder else None
         if question is None:
-            unasked += 1
+            unasked.append(issue)
         elif question.key in questions:
             # Même pause, autre indice : une seule question, celle du type le plus parlant.
             kept = questions[question.key]
@@ -141,6 +144,20 @@ def build_questions(model: ScoreModel, report: ValidationReport) -> tuple[list[Q
     ordered = sorted(questions.values(), key=lambda q: (
         _rank(q.code), q.part_id, q.measure_numbers[0] if q.measure_numbers else 0))
     return ordered, unasked
+
+
+def check_items(model: ScoreModel, issues: list[Issue]) -> list[dict]:
+    """Passages à vérifier à l'œil (problèmes sans question), dans l'ordre de la
+    partition : de quoi les montrer dans la vue côte à côte."""
+    items = []
+    for issue in issues:
+        _, measure = _part_and_measure(model, issue)
+        details = {k: v for k, v in issue.details.items()
+                   if isinstance(v, str | int | float) and k not in ("ref_index", "measure_id")}
+        items.append({"code": issue.code, "measure_numbers": list(issue.measure_numbers),
+                      "measure_id": measure.id if measure else None,
+                      "page": measure.page if measure else None, "details": details})
+    return sorted(items, key=lambda i: i["measure_numbers"][0] if i["measure_numbers"] else 0)
 
 
 def _rank(code: str) -> int:
@@ -308,7 +325,8 @@ def _question(model: ScoreModel, issue: Issue, symbols: list[Symbol], params: di
         boxes.append(measure.bbox)
     region = _union(boxes, REGION_MARGIN) if boxes else None
     return Question(key=key or _key(model, issue), code=issue.code, part_id=issue.part_id,
-                    measure_numbers=list(issue.measure_numbers), page=page, region=region,
+                    measure_numbers=list(issue.measure_numbers), page=page,
+                    measure_id=measure.id if measure else None, region=region,
                     highlights=highlights, params=params, choices=choices,
                     confidence=issue.confidence)
 

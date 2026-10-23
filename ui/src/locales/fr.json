@@ -13,7 +13,7 @@
   },
   "panels": {
     "scan": "Partition d'origine",
-    "scanEmpty": "Importez une partition PDF ou une image pour commencer.",
+    "scanEmpty": "Ouvrez une partition : ses pages s'afficheront ici.",
     "questions": "Questions",
     "questionsEmpty": "Ouvrez une partition, ou choisissez-en une dans la liste.",
     "result": "Partition reconnue",
@@ -105,6 +105,33 @@
     "tesseract_not_found": "Tesseract est introuvable : les textes ne peuvent pas être lus.",
     "audiveris_failed": "Audiveris n'a pas réussi à lire cette partition.",
     "audiveris_timeout": "La lecture par Audiveris a pris trop de temps.",
-    "no_music_recognized": "Aucune musique n'a été trouvée dans ce fichier."
+    "no_music_recognized": "Aucune musique n'a été trouvée dans ce fichier.",
+    "page_not_found": "Cette page est introuvable.",
+    "score_not_found": "Cette partition est introuvable.",
+    "rendering_failed": "La partition n'a pas pu être dessinée."
+  },
+  "scan": {
+    "loading": "Chargement de la page…",
+    "previous": "◀ Page précédente",
+    "next": "Page suivante ▶",
+    "page": "Page {{page}} ({{count}} pages de musique)",
+    "imageAlt": "Page {{page}} de la partition d'origine",
+    "measure": "Mesure {{number}}",
+    "noImage": "L'image de cette page n'est plus disponible."
+  },
+  "score": {
+    "loading": "Dessin de la partition…"
+  },
+  "checks": {
+    "title_one": "{{count}} passage à vérifier à l'œil",
+    "title_other": "{{count}} passages à vérifier à l'œil",
+    "where": "Mesure {{measure}}",
+    "measure_duration": ": la mesure compte {{read}} noire(s) au lieu de {{expected}}.",
+    "time_signature_missing": ": aucun chiffrage n'a été lu.",
+    "measure_number_mismatch": ": les numéros imprimés ({{printed_before}}, puis {{printed_after}}) ne suivent pas.",
+    "part_measures_missing": ": les autres parties ont {{missing}} mesure(s) de plus par ici.",
+    "part_measures_extra": ": cette partie a {{extra}} mesure(s) de plus que les autres par ici.",
+    "part_time_signature_differs": ": le chiffrage diffère de celui des autres parties.",
+    "other": ": à vérifier."
   }
 }

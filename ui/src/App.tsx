@@ -3,7 +3,8 @@
 // Disposition prévue par le cahier des charges :
 //   à gauche le scan d'origine, au centre les questions, à droite le rendu Verovio.
 // Tâche 8 : ouverture d'une partition et questions guidées (zone du centre).
-// Les zones de gauche et de droite seront remplies à la tâche 9 (vue côte à côte).
+// Tâche 9 : vue côte à côte. Une mesure choisie (clic sur le scan, sur le rendu, question
+// en cours ou passage à vérifier) est montrée des deux côtés.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -11,6 +12,8 @@ import { useTranslation } from 'react-i18next'
 import { type AppInfo, isError, type PythonApi, type ScoreSummary, waitForBridge } from './bridge'
 import { SUPPORTED_LANGUAGES } from './i18n'
 import QuestionPanel from './QuestionPanel'
+import ScanView from './ScanView'
+import ScoreView from './ScoreView'
 import './App.css'
 
 /** État de la connexion au moteur Python. */
@@ -55,6 +58,11 @@ export default function App({ connect = waitForBridge }: AppProps) {
   const [reading, setReading] = useState<string | null>(null) // étape de la lecture en cours
   const [openError, setOpenError] = useState<string | null>(null)
   const [openedParts, setOpenedParts] = useState<number | null>(null)
+  // Vue côte à côte : page montrée à gauche, mesure choisie, et un compteur qui change à
+  // chaque correction (les deux vues se redessinent alors).
+  const [page, setPage] = useState<number | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [version, setVersion] = useState(0)
   const poll = useRef<number | null>(null)
 
   useEffect(() => {
@@ -81,12 +89,26 @@ export default function App({ connect = waitForBridge }: AppProps) {
     }
   }, [connect])
 
-  /** Relit le nombre de corrections (affiché dans la barre d'état). */
+  /** Après une correction : relit le nombre de corrections, redessine les deux vues. */
   const refreshInfo = useCallback(async () => {
+    setVersion((v) => v + 1)
     if (engine.kind !== 'connected') return
     const info = await engine.api.get_app_info()
     setEngine({ ...engine, info })
   }, [engine])
+
+  /** Choisit une partition : sa première page, aucune mesure choisie. */
+  const chooseScore = useCallback((id: number | null, known: ScoreSummary[]) => {
+    setScoreId(id)
+    setSelected(null)
+    setPage(known.find((s) => s.score_id === id)?.pages[0] ?? null)
+  }, [])
+
+  /** Montre une mesure des deux côtés (et sa page à gauche). */
+  const focusMeasure = useCallback((measureId: string | null, measurePage: number | null) => {
+    setSelected(measureId)
+    if (measurePage !== null) setPage(measurePage)
+  }, [])
 
   async function openScore() {
     if (engine.kind !== 'connected') return
@@ -105,8 +127,9 @@ export default function App({ connect = waitForBridge }: AppProps) {
       if (isError(result)) {
         setOpenError(result.error)
       } else {
-        setScores([...result.scores, ...scores])
-        setScoreId(result.scores[0]?.score_id ?? null)
+        const known = [...result.scores, ...scores]
+        setScores(known)
+        chooseScore(result.scores[0]?.score_id ?? null, known)
         setOpenedParts(result.scores.length)
       }
     } catch {
@@ -135,7 +158,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
             <label className="score-picker">
               {t('scores.label')}
               <select value={scoreId ?? ''} disabled={reading !== null}
-                onChange={(e) => setScoreId(e.target.value ? Number(e.target.value) : null)}>
+                onChange={(e) => chooseScore(e.target.value ? Number(e.target.value) : null, scores)}>
                 <option value="">{t('scores.choose')}</option>
                 {groupByPiece(scores, t('scores.unknownPiece')).map(([title, parts]) => (
                   <optgroup key={title} label={title}>
@@ -168,7 +191,12 @@ export default function App({ connect = waitForBridge }: AppProps) {
       <main className="panels">
         <section className="panel" aria-labelledby="panel-scan">
           <h2 id="panel-scan">{t('panels.scan')}</h2>
-          <p className="empty">{t('panels.scanEmpty')}</p>
+          {engine.kind === 'connected' && scoreId !== null && page !== null && reading === null ? (
+            <ScanView api={engine.api} scoreId={scoreId} page={page} version={version}
+              selectedMeasure={selected} onPage={setPage} onSelect={focusMeasure} />
+          ) : (
+            <p className="empty">{t('panels.scanEmpty')}</p>
+          )}
         </section>
         <section className="panel panel-questions" aria-labelledby="panel-questions">
           <h2 id="panel-questions">{t('panels.questions')}</h2>
@@ -184,14 +212,20 @@ export default function App({ connect = waitForBridge }: AppProps) {
             <p className="error">{t(`errors.${openError}`, { defaultValue: t('errors.unexpected') })}</p>
           )}
           {reading === null && engine.kind === 'connected' && scoreId !== null ? (
-            <QuestionPanel api={engine.api} scoreId={scoreId} onAnswered={refreshInfo} />
+            <QuestionPanel api={engine.api} scoreId={scoreId} onAnswered={refreshInfo}
+              onFocus={focusMeasure} />
           ) : (
             reading === null && <p className="empty">{t('panels.questionsEmpty')}</p>
           )}
         </section>
         <section className="panel" aria-labelledby="panel-result">
           <h2 id="panel-result">{t('panels.result')}</h2>
-          <p className="empty">{t('panels.resultEmpty')}</p>
+          {engine.kind === 'connected' && scoreId !== null && reading === null ? (
+            <ScoreView api={engine.api} scoreId={scoreId} version={version}
+              selectedMeasure={selected} onSelect={focusMeasure} />
+          ) : (
+            <p className="empty">{t('panels.resultEmpty')}</p>
+          )}
         </section>
       </main>
 

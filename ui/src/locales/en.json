@@ -13,7 +13,7 @@
   },
   "panels": {
     "scan": "Original score",
-    "scanEmpty": "Import a PDF score or an image to get started.",
+    "scanEmpty": "Open a score: its pages will appear here.",
     "questions": "Questions",
     "questionsEmpty": "Open a score, or pick one from the list.",
     "result": "Recognized score",
@@ -105,6 +105,33 @@
     "tesseract_not_found": "Tesseract cannot be found: texts cannot be read.",
     "audiveris_failed": "Audiveris could not read this score.",
     "audiveris_timeout": "Reading with Audiveris took too long.",
-    "no_music_recognized": "No music was found in this file."
+    "no_music_recognized": "No music was found in this file.",
+    "page_not_found": "This page cannot be found.",
+    "score_not_found": "This score cannot be found.",
+    "rendering_failed": "The score could not be drawn."
+  },
+  "scan": {
+    "loading": "Loading the page…",
+    "previous": "◀ Previous page",
+    "next": "Next page ▶",
+    "page": "Page {{page}} ({{count}} pages of music)",
+    "imageAlt": "Page {{page}} of the original score",
+    "measure": "Bar {{number}}",
+    "noImage": "The image of this page is no longer available."
+  },
+  "score": {
+    "loading": "Drawing the score…"
+  },
+  "checks": {
+    "title_one": "{{count}} spot to check by eye",
+    "title_other": "{{count}} spots to check by eye",
+    "where": "Bar {{measure}}",
+    "measure_duration": ": the bar has {{read}} quarter note(s) instead of {{expected}}.",
+    "time_signature_missing": ": no time signature was read.",
+    "measure_number_mismatch": ": the printed bar numbers ({{printed_before}}, then {{printed_after}}) do not follow.",
+    "part_measures_missing": ": the other parts have {{missing}} more bar(s) around here.",
+    "part_measures_extra": ": this part has {{extra}} more bar(s) than the others around here.",
+    "part_time_signature_differs": ": the time signature differs from the other parts.",
+    "other": ": to be checked."
   }
 }

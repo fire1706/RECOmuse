@@ -25,6 +25,8 @@ Lancer le logiciel : `.venv\Scripts\python -m recomuse`
 partition par partie), puis la zone du centre pose les questions une à une. Les parties
 d'un même morceau (même titre, dans un seul PDF ou dans des fichiers séparés) sont
 comparées entre elles : une partie qui s'écarte des autres donne aussi une question.
+Vue côte à côte : à gauche la page d'origine (mesures encadrées), à droite la partition
+reconnue dessinée par Verovio ; cliquer une mesure d'un côté la montre de l'autre.
 
 Tests : `.venv\Scripts\python -m pytest` à la racine, `npm test` dans `ui/`.
 Tests lents, sur demande : `-m corpus` (vraies partitions de `tests/corpus/` ou `test/corpus/`)

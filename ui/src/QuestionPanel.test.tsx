@@ -112,6 +112,21 @@ describe('QuestionPanel', () => {
     expect(screen.getByRole('button', { name: 'Non, une seule mesure, comme lu' })).toBeInTheDocument()
   })
 
+  it('montre la question en cours et les passages à vérifier dans la vue côte à côte', async () => {
+    const onFocus = vi.fn()
+    const check = { code: 'measure_duration', measure_numbers: [12], measure_id: 'm12', page: 2,
+      details: { read: '3', expected: '4' } }
+    const api = fakeApi({ get_questions: async () => questionsState([restQuestion], { checks: [check], unasked: 1 }) })
+    render(<QuestionPanel api={api} scoreId={1} onFocus={onFocus} />)
+    await screen.findByText(/Est-ce une pause de 8 mesures/)
+    expect(onFocus).toHaveBeenCalledWith('m3', 1)
+
+    expect(screen.getByText("1 passage à vérifier à l'œil")).toBeInTheDocument()
+    expect(screen.getByText(/la mesure compte 3 noire\(s\) au lieu de 4/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Mesure 12' }))
+    expect(onFocus).toHaveBeenLastCalledWith('m12', 2)
+  })
+
   it('parle anglais', async () => {
     await act(() => i18n.changeLanguage('en'))
     const api = fakeApi({ get_questions: async () => questionsState([noteQuestion]) })

@@ -48,7 +48,7 @@ body {
 .panels {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 1.6fr 1fr;
+  grid-template-columns: 1.3fr 1fr 1.3fr;
   gap: 0.75rem;
   padding: 0.75rem;
   min-height: 0;
@@ -199,4 +199,67 @@ button:disabled {
   background: none;
   color: #1d3557;
   text-decoration: underline;
+}
+
+/* --- Vue côte à côte -------------------------------------------------------------- */
+
+.page-nav {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+/* La page et ses mesures : les cadres sont placés en pourcentages de l'image. */
+.scan-page {
+  position: relative;
+}
+
+.scan-page img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.measure-box {
+  position: absolute;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.measure-box:hover {
+  border-color: #457b9d;
+  background: rgb(69 123 157 / 8%);
+}
+
+.measure-box.selected {
+  border: 2px solid #e8590c;
+  background: rgb(232 89 12 / 10%);
+}
+
+.score-view svg {
+  width: 100%;
+  height: auto;
+}
+
+.score-view g.measure {
+  cursor: pointer;
+}
+
+/* Mesure choisie : dessinée en orange. */
+.score-view g.measure.selected {
+  fill: #e8590c;
+  stroke: #e8590c;
+  color: #e8590c;
+}
+
+.checks {
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.checks ul {
+  padding-left: 1.2rem;
 }

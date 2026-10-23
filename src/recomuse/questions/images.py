@@ -1,4 +1,5 @@
-"""Image d'une question : la zone de la page concernée, les symboles douteux entourés.
+"""Images pour l'interface : celle d'une question (la zone de la page concernée, les
+symboles douteux entourés) et celle d'une page entière (vue côte à côte).
 
 L'image est renvoyée à l'interface sous forme de « data URL » (le PNG écrit en texte,
 base64) : l'interface l'affiche directement, sans avoir à lire un fichier sur le disque.
@@ -49,3 +50,22 @@ def question_image(page: np.ndarray | Path, region: Box, highlights: list[Box],
     if not ok:
         raise ValueError("Encodage PNG impossible.")
     return "data:image/png;base64," + base64.b64encode(encoded.tobytes()).decode("ascii")
+
+
+# Image d'une page entière pour la vue côte à côte : réduite (l'écran n'a pas besoin des
+# 300 dpi) et en JPEG, beaucoup plus léger que le PNG pour une page de musique.
+PAGE_WIDTH = 1400
+PAGE_QUALITY = 80
+
+
+def page_image(page: np.ndarray | Path, max_width: int = PAGE_WIDTH) -> str:
+    """Page entière, réduite à `max_width` pixels de large, en data URL JPEG."""
+    pixels = read_gray(page) if isinstance(page, Path) else page
+    height, width = pixels.shape[:2]
+    if width > max_width:
+        pixels = cv2.resize(pixels, (max_width, max(1, round(height * max_width / width))),
+                            interpolation=cv2.INTER_AREA)
+    ok, encoded = cv2.imencode(".jpg", pixels, [cv2.IMWRITE_JPEG_QUALITY, PAGE_QUALITY])
+    if not ok:
+        raise ValueError("Encodage JPEG impossible.")
+    return "data:image/jpeg;base64," + base64.b64encode(encoded.tobytes()).decode("ascii")

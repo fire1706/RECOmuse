@@ -41,6 +41,8 @@ export interface Question {
   part_id: string
   measure_numbers: number[]
   page: number | null
+  /** Mesure concernée (montrée dans la vue côte à côte). */
+  measure_id: string | null
   params: Record<string, unknown>
   choices: Choice[]
   confidence: number
@@ -50,12 +52,57 @@ export interface Question {
   image: string | null
 }
 
+/** Un passage à vérifier à l'œil (doute sans question). */
+export interface Check {
+  /** Type de doute : checks.<code>. */
+  code: string
+  measure_numbers: number[]
+  measure_id: string | null
+  page: number | null
+  details: Record<string, string | number>
+}
+
+/** Une mesure dessinée sur une page (boîte en pixels de l'image à 300 dpi). */
+export interface PageMeasure {
+  id: string
+  number: number
+  length: number
+  part_id: string
+  bbox: [number, number, number, number]
+}
+
+/** Une page de la partition d'origine, pour la vue côte à côte. */
+export interface PageView {
+  score_id: number
+  page: number
+  /** Image de la page (data URL JPEG), ou null si elle manque. */
+  image: string | null
+  width: number
+  height: number
+  measures: PageMeasure[]
+  /** Pages de musique de la partition. */
+  pages: number[]
+}
+
+/** La partition reconnue, en MEI pour Verovio. */
+export interface Rendering {
+  score_id: number
+  mei: string
+  /** Identifiant MEI → identifiant du symbole du modèle. */
+  symbols: Record<string, string>
+  /** Identifiant MEI → identifiant de la mesure du modèle. */
+  measures: Record<string, string>
+  /** Identifiant de mesure → page de la partition d'origine. */
+  measure_pages: Record<string, number | null>
+}
+
 /** Questions encore à poser pour une partition. */
 export interface QuestionsState {
   score_id: number
   questions: Question[]
   /** Points sans question (à revoir dans la vue côte à côte). */
   unasked: number
+  checks: Check[]
   /** Nombre d'autres parties du morceau auxquelles la partition a été comparée. */
   compared_parts: number
   answered: number
@@ -85,6 +132,8 @@ export interface PythonApi {
     value: number | null,
   ): Promise<QuestionsState | EngineError>
   undo_answer(scoreId: number): Promise<QuestionsState | EngineError>
+  get_page(scoreId: number, page: number): Promise<PageView | EngineError>
+  get_rendering(scoreId: number): Promise<Rendering | EngineError>
 }
 
 /** Vrai si la réponse du moteur est une erreur. */

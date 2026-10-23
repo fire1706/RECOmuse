@@ -154,3 +154,22 @@ def test_parts_of_a_piece_are_compared(conn, tmp_path):
     session.answer(ids["clarinette"], question["key"], "accept")
     assert sum(m.length for m in load_model(conn, ids["clarinette"]).parts[0].measures) == 7
     assert session.state(ids["flute"])["questions"] == []
+
+
+def test_unasked_issues_are_listed_as_checks(conn, score_id, tmp_path):
+    """Une mesure au compte faux, sans explication : pas de question, mais un passage à
+    vérifier, avec sa mesure et sa page."""
+    model = model_of([measure("m1", quarters("m1", 4), [treble(), four_four()]),
+                      measure("m2", quarters("m2", 3)),
+                      measure("m3", quarters("m3", 4))])
+    save_model(conn, score_id, model)
+    state = QuestionSession(conn, work_dir=tmp_path / "travail").state(score_id)
+    assert state["questions"] == [] and state["unasked"] == 1
+    assert state["checks"] == [{"code": "measure_duration", "measure_numbers": [2],
+                                "measure_id": "m2", "page": 1,
+                                "details": {"read": "3", "expected": "4"}}]
+
+
+def test_questions_name_their_measure(session, score_id, stored):
+    [question] = session.state(score_id)["questions"]
+    assert question["measure_id"] == "m2" and question["page"] == 1

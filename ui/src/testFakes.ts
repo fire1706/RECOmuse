@@ -17,6 +17,7 @@ export const restQuestion: Question = {
   part_id: 'P1',
   measure_numbers: [3],
   page: 1,
+  measure_id: 'm3',
   params: { count: 8 },
   choices: [
     { id: 'accept', label: 'rest_measures', params: { count: 8 }, input: null },
@@ -35,6 +36,7 @@ export const noteQuestion: Question = {
   part_id: 'P1',
   measure_numbers: [5],
   page: 2,
+  measure_id: 'm5',
   params: {},
   choices: [
     { id: 'accept', label: 'note', params: { note: { step: 'C', octave: 6, alter: 0 } }, input: null },
@@ -46,7 +48,7 @@ export const noteQuestion: Question = {
 }
 
 export function questionsState(questions: Question[], extra: Partial<QuestionsState> = {}): QuestionsState {
-  return { score_id: 1, questions, unasked: 0, compared_parts: 0, answered: 0, can_undo: false, ...extra }
+  return { score_id: 1, questions, unasked: 0, checks: [], compared_parts: 0, answered: 0, can_undo: false, ...extra }
 }
 
 /** Faux pont : chaque méthode peut être remplacée par le test. */
@@ -61,6 +63,8 @@ export function fakeApi(overrides: Partial<PythonApi> = {}, info: AppInfo = fake
     get_questions: async () => questionsState([]),
     answer_question: async () => questionsState([]),
     undo_answer: async () => questionsState([]),
+    get_page: async () => ({ error: 'page_not_found' }),
+    get_rendering: async () => ({ error: 'score_not_found' }),
     ...overrides,
   }
 }

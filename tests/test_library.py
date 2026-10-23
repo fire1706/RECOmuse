@@ -85,3 +85,24 @@ def test_piece_of_groups_parts_by_title(conn):
     assert library.piece_of(conn, other) == [other]
     assert library.piece_of(conn, untitled_b) == [untitled_a, untitled_b]
     assert library.piece_of(conn, 999) == []
+
+
+def test_page_view_and_rendering(conn, tmp_path, no_tools, monkeypatch):
+    monkeypatch.setattr("recomuse.paths.imports_dir", lambda: tmp_path / "travail")
+    api = Api(conn, ":memory:")
+    [score] = api.open_file(str(part_pdf(tmp_path / "partie.pdf")))["scores"]
+    sid = score["score_id"]
+
+    view = api.get_page(sid, 1)
+    assert view["image"].startswith("data:image/jpeg;base64,")
+    assert view["pages"] == [1] and view["width"] > 0 and view["height"] > 0
+    assert len(view["measures"]) == 24
+    first = view["measures"][0]
+    assert first["number"] == 1 and len(first["bbox"]) == 4 and first["part_id"] == "P1"
+    assert api.get_page(sid, 9) == {"error": "page_not_found"}
+
+    rendering = api.get_rendering(sid)
+    assert rendering["mei"].count("<measure ") == 24
+    assert set(rendering["measures"].values()) == {m["id"] for m in view["measures"]}
+    assert set(rendering["measure_pages"].values()) == {1}
+    assert api.get_rendering(999) == {"error": "score_not_found"}

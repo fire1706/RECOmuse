@@ -2,7 +2,7 @@
 // choix cliquables. « Passer » remet la question à plus tard ; « Annuler ma dernière
 // réponse » défait la dernière réponse (ses corrections sont annulées dans le journal).
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -20,6 +20,8 @@ interface QuestionPanelProps {
   scoreId: number
   /** Appelé après chaque réponse (le nombre de corrections a changé). */
   onAnswered?: () => void
+  /** Montre une mesure dans la vue côte à côte (question en cours, passage à vérifier). */
+  onFocus?: (measureId: string | null, page: number | null) => void
 }
 
 /** Clé de traduction du texte d'une question (certaines dépendent d'un paramètre). */
@@ -42,7 +44,7 @@ export function orderQuestions(questions: Question[], skipped: string[]): Questi
   ]
 }
 
-export default function QuestionPanel({ api, scoreId, onAnswered }: QuestionPanelProps) {
+export default function QuestionPanel({ api, scoreId, onAnswered, onFocus }: QuestionPanelProps) {
   const { t, i18n } = useTranslation()
   const language = (i18n.resolvedLanguage ?? 'fr') as Language
   const [state, setState] = useState<QuestionsState | null>(null)
@@ -90,6 +92,20 @@ export default function QuestionPanel({ api, scoreId, onAnswered }: QuestionPane
     }
   }
 
+  const ordered = state ? orderQuestions(state.questions, skipped) : []
+  const question = ordered[0]
+
+  // La question en cours est montrée dans la vue côte à côte (une fois par question :
+  // l'utilisateur peut ensuite regarder ailleurs).
+  const focus = useRef(onFocus)
+  focus.current = onFocus
+  const focusMeasure = question?.measure_id ?? null
+  const focusPage = question?.page ?? null
+  const focusKey = question?.key
+  useEffect(() => {
+    if (focusKey) focus.current?.(focusMeasure, focusPage)
+  }, [focusKey, focusMeasure, focusPage])
+
   if (state === null) {
     return error ? (
       <p className="error">{t(`errors.${error}`, { defaultValue: t('errors.unexpected') })}</p>
@@ -98,9 +114,6 @@ export default function QuestionPanel({ api, scoreId, onAnswered }: QuestionPane
     )
   }
 
-  const ordered = orderQuestions(state.questions, skipped)
-  const question = ordered[0]
-
   const undoButton = state.can_undo && (
     <button type="button" className="link-button" disabled={busy}
       onClick={() => send(api.undo_answer(scoreId))}>
@@ -108,11 +121,30 @@ export default function QuestionPanel({ api, scoreId, onAnswered }: QuestionPane
     </button>
   )
 
+  // Passages à vérifier à l'œil : un clic les montre dans la vue côte à côte.
+  const checks = state.checks.length > 0 && (
+    <details className="checks" open={!question}>
+      <summary>{t('checks.title', { count: state.checks.length })}</summary>
+      <ul>
+        {state.checks.map((check, k) => (
+          <li key={k}>
+            <button type="button" className="link-button"
+              onClick={() => onFocus?.(check.measure_id, check.page)}>
+              {t('checks.where', { measure: check.measure_numbers.slice(0, 3).join(', ') })}
+            </button>{' '}
+            {t(`checks.${check.code}`, { ...check.details, defaultValue: t('checks.other') })}
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+
   if (!question) {
     return (
       <div className="questions-done">
         <p>{t('questions.done')}</p>
         {state.unasked > 0 && <p className="empty">{t('questions.unasked', { count: state.unasked })}</p>}
+        {checks}
         {undoButton}
       </div>
     )
@@ -179,6 +211,7 @@ export default function QuestionPanel({ api, scoreId, onAnswered }: QuestionPane
         </button>
         {undoButton}
       </div>
+      {checks}
     </div>
   )
 }

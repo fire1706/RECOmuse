@@ -24,7 +24,7 @@ def three_four_model():
 def test_missed_time_signature_becomes_one_question():
     model = three_four_model()
     questions, unasked = build_questions(model, validate(model))
-    assert unasked == 0
+    assert unasked == []
     [question] = questions
     assert question.code == "time_signature_missed"
     assert question.key == "time_signature_missed:P1:m2,m3,m4,m5"
@@ -41,7 +41,7 @@ def test_wrong_measure_without_proposal_is_not_a_question():
                       measure("m2", quarters("m2", 3)),
                       measure("m3", quarters("m3", 4))])
     questions, unasked = build_questions(model, validate(model))
-    assert questions == [] and unasked == 1
+    assert questions == [] and len(unasked) == 1
 
 
 def multirest_model():
@@ -87,7 +87,7 @@ def test_numbering_jump_without_a_rest_is_not_a_question():
     jump = Issue("measure_number_mismatch", "P1", [4], "error", 0.7,
                  details={"printed_before": 1, "printed_after": 10, "missing": 2})
     questions, unasked = build_questions(model, ValidationReport([jump]))
-    assert questions == [] and unasked == 1
+    assert questions == [] and len(unasked) == 1
 
 
 def test_notes_out_of_range_are_grouped_by_direction():
@@ -165,7 +165,7 @@ def test_comparison_questions():
                      action={"insert_time": "3/4", "before_measure": 14})
     questions, unasked = build_questions(
         model, ValidationReport([missing, extra, unexplained, differs, inserted]))
-    assert unasked == 1
+    assert [i.code for i in unasked] == ["part_measures_missing"]
     by_key = {q.key: q for q in questions}
 
     short = by_key["multirest:P1:m2"]

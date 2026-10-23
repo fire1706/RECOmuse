@@ -22,7 +22,7 @@ from recomuse.learning.corrections import CorrectionService
 from recomuse.model.score import ScoreModel
 from recomuse.model.store import load_model
 from recomuse.questions.images import question_image
-from recomuse.questions.questions import Question, build_questions
+from recomuse.questions.questions import Question, build_questions, check_items
 from recomuse.validation.comparison import compare_parts, part_refs
 from recomuse.validation.geometry import PageGeometries
 from recomuse.validation.issues import Issue, ValidationReport
@@ -60,7 +60,8 @@ class QuestionSession:
             data = question.to_dict()
             data["image"] = self._image(model, question, geometries)
             listed.append(data)
-        return {"score_id": score_id, "questions": listed, "unasked": unasked,
+        return {"score_id": score_id, "questions": listed, "unasked": len(unasked),
+                "checks": check_items(model, unasked),
                 "compared_parts": self._compared.get(score_id, 0),
                 "answered": self._answer_count(score_id),
                 "can_undo": self._last_answer(score_id) is not None}
@@ -115,7 +116,8 @@ class QuestionSession:
             raise QuestionError(f"Aucune partition lue sous le n° {score_id}.")
         return model
 
-    def _questions(self, score_id: int, model: ScoreModel) -> tuple[list[Question], int]:
+    def _questions(self, score_id: int,
+                   model: ScoreModel) -> tuple[list[Question], list[Issue]]:
         report = validate(model, read_number=self._number_reader(),
                           geometries=self._page_images(score_id))
         report = ValidationReport(report.issues + self._comparison(score_id, model))

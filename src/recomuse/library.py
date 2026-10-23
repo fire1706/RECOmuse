@@ -16,11 +16,13 @@ from collections.abc import Callable
 from pathlib import Path
 
 from recomuse import paths
+from recomuse.export.mei import model_to_mei
 from recomuse.importer import import_score, register_score
 from recomuse.model.build import build_model
 from recomuse.model.score import ScoreModel
 from recomuse.model.split import normalized, split_parts
 from recomuse.model.store import load_model, save_model
+from recomuse.questions.images import page_image
 from recomuse.recognition.pipeline import recognize_score
 
 # Étapes annoncées à l'interface (traduites par elle).
@@ -86,6 +88,38 @@ def piece_of(conn: sqlite3.Connection, score_id: int) -> list[int]:
     if title:
         return [r[0] for r in rows if normalized(r[1]) == title]
     return [r[0] for r in rows if not normalized(r[1]) and r[2] == row[1]]
+
+
+def page_view(conn: sqlite3.Connection, score_id: int, page_number: int) -> dict | None:
+    """Une page pour la vue côte à côte : son image, sa taille d'origine (les boîtes sont
+    en pixels de l'image à 300 dpi) et les mesures qu'elle contient. None si la partition
+    ou la page n'existe pas."""
+    model = load_model(conn, score_id)
+    page = model.page(page_number) if model else None
+    if page is None:
+        return None
+    image = None
+    if page.image_path and Path(page.image_path).is_file():
+        image = page_image(Path(page.image_path))
+    measures = [{"id": m.id, "number": m.number, "length": m.length, "part_id": part.id,
+                 "bbox": list(m.bbox)}
+                for part in model.parts for m in part.measures
+                if m.page == page_number and m.bbox is not None]
+    return {"score_id": score_id, "page": page_number, "image": image,
+            "width": page.width, "height": page.height, "measures": measures,
+            "pages": [p.number for p in model.pages if p.source != "none"]}
+
+
+def rendering(conn: sqlite3.Connection, score_id: int) -> dict | None:
+    """La partition reconnue, en MEI pour Verovio, avec la correspondance entre les
+    identifiants du MEI et ceux du modèle, et la page de chaque mesure."""
+    model = load_model(conn, score_id)
+    if model is None:
+        return None
+    result = model_to_mei(model)
+    result["measure_pages"] = {m.id: m.page for part in model.parts for m in part.measures}
+    result["score_id"] = score_id
+    return result
 
 
 def summary(score_id: int, model: ScoreModel) -> dict:

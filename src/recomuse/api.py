@@ -104,6 +104,18 @@ class Api:
         """Partitions déjà lues, de la plus récente à la plus ancienne."""
         return library.list_scores(self._conn)
 
+    # --- Vue côte à côte -------------------------------------------------------------------
+
+    def get_page(self, score_id: int, page: int) -> dict:
+        """Image d'une page et ses mesures (voir library.page_view)."""
+        result = self._guarded(lambda: library.page_view(self._conn, score_id, page))
+        return result if result is not None else {"error": "page_not_found"}
+
+    def get_rendering(self, score_id: int) -> dict:
+        """Partition reconnue en MEI, pour Verovio (voir library.rendering)."""
+        result = self._guarded(lambda: library.rendering(self._conn, score_id))
+        return result if result is not None else {"error": "score_not_found"}
+
     # --- Questions ------------------------------------------------------------------------
 
     def get_questions(self, score_id: int) -> dict:
