@@ -94,3 +94,24 @@ def test_vector_reading_known_results(prefix):
     summary = read_vector_pdf(matches[0], pages).to_dict()
     for key, value in expected.items():
         assert summary[key] == value, key
+
+
+# Tâche 4b-2 : sur ces pages (une seule partie à chaque fois), toutes les mesures ont la
+# durée de leur chiffrage, et la numérotation calculée correspond aux numéros imprimés.
+EXACT_RHYTHMS = {
+    "Michael Buble": [1, 2, 3], "Monty Norman": [1, 2, 3], "Paul Anka": [1, 2, 3],
+    "Miklos": [1, 2, 3], "blues_on_the_hill--": [1, 2],
+    "throwin_down": [1, 2],   # la page 3 commence la partie suivante
+}
+
+
+@pytest.mark.parametrize("prefix", sorted(EXACT_RHYTHMS))
+def test_vector_rhythms_and_numbering(prefix):
+    matches = [p for p in corpus_pdfs() if p.name.startswith(prefix)]
+    if not matches:
+        pytest.skip(f"{prefix} absent du corpus")
+    score = read_vector_pdf(matches[0], EXACT_RHYTHMS[prefix])
+    assert score.duration_mismatches() == []
+    for item in score.part_measures():
+        if item.measure.printed_number is not None:
+            assert item.measure.printed_number == item.number

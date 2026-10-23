@@ -16,6 +16,23 @@ from recomuse.recognition.__main__ import parse_page_range
 from recomuse.vector import read_vector_pdf
 
 
+def _event_label(event, measure) -> str:
+    """« C5:1/2 » pour une croche, « [C5 E5]:1 » pour un accord, « -:1 » pour un soupir."""
+    from recomuse.vector.reader import Note
+
+    if isinstance(event, Note):
+        chord = [n for n in measure.notes if n is event or (n.chord and abs(n.x - event.x) < 3
+                                                             and n.voice == event.voice)]
+        names = " ".join(n.name or n.head for n in sorted(chord, key=lambda n: n.position))
+        label = f"[{names}]" if len(chord) > 1 else names
+        if event.tie_start:
+            label += "~"
+    else:
+        label = "-"
+    duration = "?" if event.duration is None else str(event.duration)
+    return f"{label}:{duration}" + (f"(v{event.voice})" if event.voice != 1 else "")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m recomuse.vector")
     parser.add_argument("file", type=Path)
@@ -39,12 +56,14 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Chiffrages      : {score.time_changes(args.part)}")
     print(f"Armures         : {score.key_changes(args.part)}")
     print(f"Pauses multiples: {score.multirests(args.part)}")
+    wrong = score.duration_mismatches(args.part)
+    print(f"Durées fausses  : {len(wrong)} mesure(s) {wrong[:20]}")
     if score.warnings:
         print(f"ATTENTION: {', '.join(score.warnings)}")
     if args.notes:
         for item in score.part_measures(args.part):
             m = item.measure
-            content = " ".join(n.name or n.head for n in m.notes)
+            content = " ".join(_event_label(e, m) for e in m.events())
             extra = []
             if m.clef:
                 extra.append(f"clé {m.clef}")
@@ -58,9 +77,12 @@ def main(argv: list[str] | None = None) -> int:
                 extra.append("pause")
             if m.printed_number is not None:
                 extra.append(f"n° imprimé {m.printed_number}")
-            rests = " ".join(r.value for r in m.rests)
+            if m.duration_ok is False:
+                extra.append(f"DURÉE {m.duration} au lieu de {m.expected_duration}")
+            if m.voices > 1:
+                extra.append("2 voix")
             print(f"  m{item.number:<4} p{item.page} s{item.system} [{', '.join(extra)}] "
-                  f"{content}" + (f" | silences: {rests}" if rests and not m.full_rest else ""))
+                  f"{content if not m.full_rest else ''}")
     return 0
 
 

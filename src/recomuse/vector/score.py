@@ -83,6 +83,21 @@ class VectorScore:
         return [(m.number, m.measure.multirest) for m in self.part_measures(rank)
                 if m.measure.is_multirest]
 
+    def duration_mismatches(self, rank: int = 0) -> list[int]:
+        """Numéros des mesures dont la durée lue ne correspond pas au chiffrage.
+
+        Une première mesure plus courte est une levée (anacrouse) : ce n'est pas une erreur.
+        """
+        wrong = []
+        for item in self.part_measures(rank):
+            measure = item.measure
+            if measure.duration_ok is not False:
+                continue
+            if item.number == 1 and measure.duration < measure.expected_duration:
+                continue   # levée
+            wrong.append(item.number)
+        return wrong
+
     def to_dict(self, rank: int = 0) -> dict:
         """Résumé simple (pour l'interface ou un fichier JSON)."""
         return {
@@ -92,6 +107,7 @@ class VectorScore:
             "time_changes": self.time_changes(rank),
             "key_changes": self.key_changes(rank),
             "multirests": self.multirests(rank),
+            "duration_mismatches": self.duration_mismatches(rank),
             "warnings": self.warnings,
         }
 
@@ -104,13 +120,14 @@ def read_vector_pdf(path: Path | str, page_numbers: list[int] | None = None) -> 
     path = Path(path)
     pages = []
     warnings: set[str] = set()
+    states: dict[int, dict] = {}   # clé, armure, chiffrage de chaque partie, de page en page
     with pymupdf.open(path) as doc:
         numbers = page_numbers or range(1, doc.page_count + 1)
         for number in numbers:
             page = doc[number - 1]
             if analyze_pdf_page(page).kind != "vector":
                 continue
-            vector_page = read_page(page)
+            vector_page = read_page(page, states)
             warnings.update(vector_page.warnings)
             # Pages de texte seul (notice, instrumentation) : rien à garder.
             if vector_page.systems:

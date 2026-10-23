@@ -4,7 +4,7 @@ import pymupdf
 import pytest
 
 from recomuse.vector import read_vector_pdf
-from recomuse.vector.primitives import extract_glyphs_and_texts, extract_lines
+from recomuse.vector.primitives import extract_glyphs_and_texts, extract_lines, extract_primitives
 from recomuse.vector.reader import Measure, StaffContent, VectorPage
 from recomuse.vector.score import VectorScore
 from recomuse.vector.staves import Staff, find_staves
@@ -135,3 +135,56 @@ def test_part_measures_numbering_and_changes():
 def test_multirest_without_number_counts_as_one_measure():
     score = make_score([[[bar(), bar(is_multirest=True, multirest=None), bar()]]])
     assert score.measure_count() == 3
+
+
+# --- Ligatures et liaisons extraites d'un PDF ---------------------------------------------------
+
+
+def beams_and_curves(draw):
+    doc = pymupdf.open()
+    page = doc.new_page()
+    draw(page)
+    prims = extract_primitives(page)
+    return prims.beams, prims.curves
+
+
+def test_sloped_filled_beam():
+    beams, _ = beams_and_curves(lambda page: page.draw_polyline(
+        [(100, 100), (150, 95), (150, 97.5), (100, 102.5)], color=None, fill=(0, 0, 0),
+        closePath=True))
+    assert len(beams) == 1
+    beam = beams[0]
+    assert (beam.x0, beam.x1) == pytest.approx((100, 150))
+    assert beam.thickness == pytest.approx(2.5)
+    assert beam.y_at(125) == pytest.approx(98.75)
+
+
+def test_thick_stroke_beam():
+    beams, _ = beams_and_curves(lambda page: page.draw_line((100, 100), (150, 95), width=2.5))
+    assert len(beams) == 1 and beams[0].thickness == pytest.approx(2.5)
+
+
+def test_hatched_beam():
+    """Ligature « hachurée » : 40 traits très fins empilés tous les 0,06 point."""
+    def draw(page):
+        for k in range(40):
+            page.draw_line((100, 100 + 0.06 * k), (150, 95 + 0.06 * k), width=0.06)
+    beams, _ = beams_and_curves(draw)
+    assert len(beams) == 1
+    assert beams[0].thickness == pytest.approx(2.4, abs=0.1)
+
+
+def test_tie_curves():
+    def draw(page):
+        # Vraie courbe remplie (deux arcs de Bézier).
+        shape = page.new_shape()
+        shape.draw_bezier((100, 100), (110, 106), (130, 106), (140, 100))
+        shape.draw_bezier((140, 100), (130, 104), (110, 104), (100, 100))
+        shape.finish(color=None, fill=(0, 0, 0))
+        shape.commit()
+        # Courbe découpée en 12 petits segments (certains exports).
+        points = [(200 + 3 * k, 100 + 0.1 * k * (11 - k)) for k in range(12)]
+        page.draw_polyline(points + points[::-1][1:], color=None, fill=(0, 0, 0))
+    _, curves = beams_and_curves(draw)
+    ends = sorted((round(c.x0), round(c.x1)) for c in curves)
+    assert ends == [(100, 140), (200, 233)]

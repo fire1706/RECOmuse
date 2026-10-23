@@ -84,7 +84,8 @@ def main(argv: list[str] | None = None) -> int:
     if result.vector and result.vector.pages:
         v = result.vector
         print(f"Lecture vectorielle : {v.measure_count()} mesures, chiffrages {v.time_changes()}, "
-              f"armures {v.key_changes()}, pauses multiples {v.multirests()}")
+              f"armures {v.key_changes()}, pauses multiples {v.multirests()}, "
+              f"durées fausses {v.duration_mismatches()}")
     if result.warnings:
         print(f"ATTENTION: {', '.join(result.warnings)}")
     print(f"-> {result.run.output_dir}")

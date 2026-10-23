@@ -5,10 +5,11 @@ Fichiers du module :
 - primitives.py : extraction des caractères, textes et traits d'une page ;
 - staves.py     : portées, barres de mesure, systèmes ;
 - pitch.py      : hauteur des notes (clé, position, armure, altérations) ;
-- reader.py     : lecture d'une page (mesures, clés, armures, chiffrages, notes...) ;
+- rhythm.py     : durées (hampes, ligatures, crochets, points, nolets, liaisons) ;
+- reader.py     : lecture d'une page (mesures, clés, armures, chiffrages, notes, durées...) ;
 - score.py      : lecture d'un PDF entier, résumé par partie.
 
-Tâche 4b-1 : structure et hauteurs. Les durées (tâche 4b-2) viendront ensuite.
+Tâche 4b-1 : structure et hauteurs. Tâche 4b-2 : durées et contrôle des mesures.
 
 Essai à la main :  python -m recomuse.vector partition.pdf --pages 1-2 --notes
 """

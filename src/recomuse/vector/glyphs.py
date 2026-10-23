@@ -51,6 +51,7 @@ SONATA_SYMBOLS: dict[int, SymbolDef] = {
     0x57: SymbolDef("notehead", "breve"),     # W : carrée
     0xC0: SymbolDef("notehead", "x"),         # ¿ : croix (percussions, notes « fantômes »)
     0xD5: SymbolDef("notehead", "slash"),     # barre oblique rythmique
+    0xF3: SymbolDef("notehead", "slash"),     # barre oblique pleine (Jazz, croches)
     # Silences
     0xB7: SymbolDef("rest", "whole"),         # ∑ : pause
     0xEE: SymbolDef("rest", "half"),          # Ó : demi-pause
@@ -97,6 +98,22 @@ SONATA_SYMBOLS: dict[int, SymbolDef] = {
     0xDE: SymbolDef("navigation", "coda"),
     0x25: SymbolDef("navigation", "segno"),
     0xBE: SymbolDef("tremolo", "tremolo"),
+}
+
+# Polices de percussions (MaestroPercussion, JazzPerc) : seules les têtes de notes
+# servent ici ; les autres caractères sont ignorés.
+PERCUSSION_SYMBOLS: dict[int, SymbolDef] = {
+    0xCF: SymbolDef("notehead", "black"),
+    0xFA: SymbolDef("notehead", "half"),
+    0x77: SymbolDef("notehead", "whole"),
+    0x78: SymbolDef("notehead", "x"),        # x : croix (cymbales, charleston)
+    0x79: SymbolDef("notehead", "x"),        # y : croix cerclée
+}
+
+# Polices « spéciales » de Sibelius (OpusSpecial, Inkpen2Special) : seul le point de
+# prolongation y a été rencontré dans le corpus.
+SPECIAL_SYMBOLS: dict[int, SymbolDef] = {
+    0xAA: SymbolDef("dot", "dot"),
 }
 
 # Chiffres des indications de mesure (et des nolets ou pauses multiples s'ils sont
