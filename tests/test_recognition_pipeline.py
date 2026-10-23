@@ -93,6 +93,24 @@ def test_missing_languages_are_reported(imported, tessdata, monkeypatch, fake_au
     assert "ocr_languages_missing" in recognize_score(imported).warnings
 
 
+def test_vector_pdf_header_is_read_from_the_pdf_text(tmp_path, monkeypatch, fake_audiveris):
+    """Page vectorielle : l'en-tête est le texte exact du PDF, sans Tesseract."""
+    set_tools(monkeypatch, audiveris=fake_audiveris)          # pas de Tesseract
+    monkeypatch.setenv("FAKE_AUDIVERIS_SHEETS", "1")          # le PDF n'a qu'une page
+    score = import_score(part_pdf(tmp_path / "partie.pdf"), tmp_path / "work")
+    result = recognize_score(score)
+
+    assert result.header.title == "MARCHE D'ACOZ"
+    assert result.header.instrument == "Flute 1"
+    assert result.header.tempo == "Allegro"
+    assert result.header.composers == ["arr. J. Dupont"]
+    assert "ocr_unavailable" not in result.warnings
+    # La lecture vectorielle a trouvé les 6 systèmes de 4 mesures.
+    assert result.vector is not None
+    assert result.vector.measure_count() == 24
+    assert result.to_dict()["vector"]["measure_count"] == 24
+
+
 def test_audiveris_is_required(imported, monkeypatch):
     set_tools(monkeypatch, audiveris=None)
     with pytest.raises(ToolNotFoundError) as info:

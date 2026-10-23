@@ -1,9 +1,13 @@
 """Reconnaissance complète d'une partition importée.
 
 Enchaînement :
-1. lecture de l'en-tête de la première page de musique avec Tesseract (titre, instrument...) ;
-2. passage d'Audiveris sur toutes les pages de musique (un seul livre) ;
-3. résumé des fichiers MusicXML produits, et textes d'Audiveris en secours.
+1. lecture vectorielle des pages vectorielles d'un PDF (tâche 4b) : structure et hauteurs
+   exactes, qui serviront à contrôler Audiveris ;
+2. lecture de l'en-tête de la première page de musique : texte exact du PDF si la page
+   est vectorielle, sinon Tesseract (titre, instrument...) ;
+3. passage d'Audiveris sur toutes les pages de musique (un seul livre). Les pages
+   vectorielles y passent aussi tant que leurs durées ne sont pas lues (tâche 4b-2) ;
+4. résumé des fichiers MusicXML produits, et textes d'Audiveris en secours.
 
 Le résultat brut d'Audiveris (MusicXML, projet .omr) sera transformé en modèle interne
 à la tâche 5, puis vérifié par le validateur (tâche 6).
@@ -22,9 +26,15 @@ from recomuse.recognition.audiveris import (
     build_book_image,
     run_audiveris,
 )
-from recomuse.recognition.header import HeaderInfo, analyze_header, complete_with_credits
+from recomuse.recognition.header import (
+    HeaderInfo,
+    analyze_header,
+    complete_with_credits,
+    lines_from_pdf_text,
+)
 from recomuse.recognition.musicxml import MovementSummary, summarize_movement
 from recomuse.recognition.ocr import OcrError, OcrLine, read_header
+from recomuse.vector import VectorScore, read_vector_pdf
 
 # Avertissements (codes traduits par l'interface).
 RecognitionWarning = Literal[
@@ -46,6 +56,7 @@ class RecognitionResult:
     header: HeaderInfo
     header_lines: list[OcrLine] = field(default_factory=list)
     warnings: list[RecognitionWarning] = field(default_factory=list)
+    vector: VectorScore | None = None      # lecture directe des pages vectorielles
 
     @property
     def measure_count(self) -> int:
@@ -69,6 +80,7 @@ class RecognitionResult:
             ],
             "header": asdict(self.header),
             "warnings": list(self.warnings),
+            "vector": self.vector.to_dict() if self.vector else None,
         }
 
 
@@ -89,11 +101,22 @@ def recognize_score(score: ImportedScore, on_progress: ProgressCallback | None =
     # de lire l'en-tête.
     book = build_book_image(score.pages, output_dir / f"{BOOK_NAME}.tif")
 
-    # 1. En-tête de la première page de musique.
+    # 1. Lecture vectorielle (rapide : moins d'une seconde par page).
+    vector = None
+    vector_pages = [p.page_number for p in score.pages if p.kind == "vector"]
+    if vector_pages and score.source_path.suffix.lower() == ".pdf":
+        vector = read_vector_pdf(score.source_path, vector_pages)
+
+    # 2. En-tête de la première page de musique : texte exact du PDF si possible.
     first_music_page = next(p for p in score.pages if p.page_number == book.sheet_pages[0])
     header_lines: list[OcrLine] = []
     header = HeaderInfo()
-    if status.tesseract and status.tessdata:
+    vector_page = next((p for p in vector.pages if p.page_number == first_music_page.page_number),
+                       None) if vector else None
+    if vector_page is not None:
+        header_lines = lines_from_pdf_text(vector_page.header_lines)
+        header = analyze_header(header_lines, first_music_page.width)
+    elif status.tesseract and status.tessdata:
         try:
             header_lines = read_header(status.tesseract, status.tessdata,
                                        first_music_page.image_path,
@@ -104,13 +127,13 @@ def recognize_score(score: ImportedScore, on_progress: ProgressCallback | None =
     else:
         warnings.append("ocr_unavailable")
 
-    # 2. Audiveris.
+    # 3. Audiveris.
     run = run_audiveris(audiveris, book, output_dir, status.tessdata, on_progress)
 
-    # 3. Résumé de la musique, et textes d'Audiveris pour compléter l'en-tête.
+    # 4. Résumé de la musique, et textes d'Audiveris pour compléter l'en-tête.
     movements = [summarize_movement(path) for path in run.movement_paths]
     if movements:
         header = complete_with_credits(header, movements[0].credits)
 
     return RecognitionResult(run=run, movements=movements, header=header,
-                             header_lines=header_lines, warnings=warnings)
+                             header_lines=header_lines, warnings=warnings, vector=vector)

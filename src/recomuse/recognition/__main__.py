@@ -81,6 +81,10 @@ def main(argv: list[str] | None = None) -> int:
               f"systèmes {movement.sheet_systems}, "
               f"{movement.measure_count} mesures, chiffrages {movement.time_signatures}, "
               f"parties {movement.part_names}")
+    if result.vector and result.vector.pages:
+        v = result.vector
+        print(f"Lecture vectorielle : {v.measure_count()} mesures, chiffrages {v.time_changes()}, "
+              f"armures {v.key_changes()}, pauses multiples {v.multirests()}")
     if result.warnings:
         print(f"ATTENTION: {', '.join(result.warnings)}")
     print(f"-> {result.run.output_dir}")

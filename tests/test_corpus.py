@@ -18,6 +18,7 @@ import pytest
 from recomuse.importer import preprocess
 from recomuse.importer.detection import analyze_pdf_page
 from recomuse.importer.loading import render_pdf_page
+from recomuse.vector import read_vector_pdf
 
 pytestmark = pytest.mark.corpus
 
@@ -59,3 +60,37 @@ def test_first_pages_are_prepared(pdf):
             if metrics:
                 # Conducteurs : jusqu'à 6 pixels seulement à 300 dpi.
                 assert 4 <= metrics.interline <= 60, analysis
+
+
+@pytest.mark.skipif(not corpus_pdfs(), reason="aucun corpus local")
+@pytest.mark.parametrize("pdf", corpus_pdfs(), ids=lambda p: p.stem[:40])
+def test_vector_reading_does_not_fail(pdf):
+    """Lecture vectorielle des 3 premières pages : pas d'erreur, et des portées trouvées
+    sur toute page vectorielle lisible."""
+    score = read_vector_pdf(pdf, [n for n in (1, 2, 3) if n <= pymupdf.open(pdf).page_count])
+    for page in score.pages:
+        assert page.systems
+
+
+# Résultats vérifiés à l'œil sur le corpus (tâche 4b-1) : ils ne doivent pas se dégrader.
+# Clé : début du nom de fichier ; valeurs : pages lues et résumé attendu de la 1re partie.
+EXPECTED_VECTOR = {
+    "throwin_down": ([1], {"time_changes": [(1, "4/4")], "key_changes": [(1, 1)],
+                           "multirests": [(2, 12)]}),
+    "Michael Buble": ([1, 2, 3], {"time_changes": [(1, "4/4")],
+                                  "key_changes": [(1, -3), (53, 4)]}),
+    "Monty Norman": ([1, 2, 3], {"measure_count": 31, "time_changes": [(1, "4/4")],
+                                 "key_changes": [(1, -1)]}),
+    "Paul Anka": ([1, 2, 3], {"measure_count": 22, "multirests": []}),
+}
+
+
+@pytest.mark.parametrize("prefix", sorted(EXPECTED_VECTOR))
+def test_vector_reading_known_results(prefix):
+    matches = [p for p in corpus_pdfs() if p.name.startswith(prefix)]
+    if not matches:
+        pytest.skip(f"{prefix} absent du corpus")
+    pages, expected = EXPECTED_VECTOR[prefix]
+    summary = read_vector_pdf(matches[0], pages).to_dict()
+    for key, value in expected.items():
+        assert summary[key] == value, key

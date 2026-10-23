@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 
 from recomuse.recognition.musicxml import CreditText
 from recomuse.recognition.ocr import OcrLine
+from recomuse.vector.primitives import TextLine
 
 # Noms d'instruments (sans accents, en minuscules). Un mot de la ligne doit COMMENCER par
 # l'un d'eux : « clarinet » reconnaît aussi « clarinette » et « clarinetten ».
@@ -32,6 +33,8 @@ INSTRUMENT_WORDS = (
     # percussions et autres
     "percussion", "slagwerk", "schlagzeug", "drum", "batterie", "timbales", "timpani",
     "pauken", "glockenspiel", "xylophone", "mallets", "keyboard", "piano", "guitar", "guitare",
+    # voix
+    "vocal", "voice", "voix", "chant", "zang", "gesang",
     # conducteur
     "conductor", "conducteur", "direction", "directie", "partitur",
 )
@@ -191,3 +194,15 @@ def complete_with_credits(info: HeaderInfo, credits: list[CreditText]) -> Header
         if others:
             info.title = _clean(max(others, key=lambda c: c.font_size or 0).text)
     return info
+
+
+def lines_from_pdf_text(texts: list[TextLine], dpi: int = 300) -> list[OcrLine]:
+    """Convertit les textes exacts d'une page PDF vectorielle au format des lignes lues par
+    Tesseract (pixels à `dpi`), pour les analyser de la même façon."""
+    scale = dpi / 72
+    return [
+        OcrLine(text=t.text, left=round(t.x0 * scale), top=round(t.y0 * scale),
+                width=round((t.x1 - t.x0) * scale), height=round((t.y1 - t.y0) * scale),
+                confidence=100.0)
+        for t in sorted(texts, key=lambda t: (t.y0, t.x0))
+    ]
