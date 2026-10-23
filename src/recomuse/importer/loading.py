@@ -96,6 +96,14 @@ def read_image_file(path: Path) -> list[LoadedImage]:
     return [LoadedImage(gray, dpi)]
 
 
+def read_gray(path: Path) -> np.ndarray:
+    """Relit une image de page en niveaux de gris, y compris dans un dossier avec accents."""
+    pixels = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_GRAYSCALE)
+    if pixels is None:
+        raise OSError(f"Image illisible : {path}")
+    return pixels
+
+
 def write_png(path: Path, pixels: np.ndarray) -> None:
     """Enregistre une image en PNG (sans perte), y compris dans un dossier avec accents."""
     ok, encoded = cv2.imencode(".png", pixels)

@@ -104,3 +104,44 @@ def vector_pdf(path: Path, page_count: int = 1, with_title: bool = True) -> Path
     doc.save(str(path))
     doc.close()
     return path
+
+
+def part_pdf(path: Path, systems: int = 6) -> Path:
+    """Partie de fanfare simplifiée, en PDF vectoriel : un en-tête (titre, instrument,
+    arrangeur, tempo) puis des portées avec barres de mesure et noires.
+
+    Sert aux tests « external » qui utilisent les vrais Audiveris et Tesseract.
+    """
+    doc = pymupdf.open()
+    page = doc.new_page(width=A4_WIDTH_PT, height=A4_HEIGHT_PT)
+    page.insert_text((190, 70), "MARCHE D'ACOZ", fontsize=26, fontname="hebo")
+    page.insert_text((40, 105), "Flute 1", fontsize=13, fontname="helv")
+    page.insert_text((440, 105), "arr. J. Dupont", fontsize=11, fontname="helv")
+    page.insert_text((50, 140), "Allegro", fontsize=12, fontname="hebo")
+
+    space = 7.0                        # interligne en points (≈ 29 pixels à 300 dpi)
+    left, right = 40, A4_WIDTH_PT - 40
+    measures = 4
+    for s in range(systems):
+        top = 160 + s * 105
+        bottom = top + 4 * space
+        for line in range(5):
+            y = top + line * space
+            page.draw_line((left, y), (right, y), width=0.8)
+        width = (right - left) / measures
+        for m in range(measures + 1):
+            x = left + m * width
+            page.draw_line((x, top), (x, bottom), width=1.2)
+        # Quatre noires par mesure, sur des hauteurs variées de la portée.
+        for m in range(measures):
+            for beat in range(4):
+                x = left + m * width + (beat + 0.6) * width / 4.5
+                y = top + ((s + m + beat) % 7) * space / 2 + space / 2
+                head = pymupdf.Rect(x - space * 0.62, y - space * 0.45,
+                                    x + space * 0.62, y + space * 0.45)
+                page.draw_oval(head, color=(0, 0, 0), fill=(0, 0, 0), width=0)
+                page.draw_line((x + space * 0.58, y), (x + space * 0.58, y - 3.4 * space),
+                               width=0.9)
+    doc.save(str(path))
+    doc.close()
+    return path

@@ -35,9 +35,14 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Les tests sur le corpus réel ne tournent que sur demande : pytest -m corpus
-addopts = "-ra -m 'not corpus'"
-markers = ["corpus: tests sur les vraies partitions du corpus local (lecture seule)"]
+# Tests lents, lancés seulement sur demande :
+#   pytest -m corpus    (vraies partitions du corpus local)
+#   pytest -m external  (vrais Audiveris et Tesseract)
+addopts = "-ra -m 'not corpus and not external'"
+markers = [
+    "corpus: tests sur les vraies partitions du corpus local (lecture seule)",
+    "external: tests qui lancent les vrais Audiveris et Tesseract",
+]
 
 [tool.ruff]
 line-length = 100

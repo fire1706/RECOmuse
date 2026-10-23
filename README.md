@@ -23,6 +23,22 @@ Lancer le logiciel : `.venv\Scripts\python -m recomuse`
 (ajouter `--dev` avec `npm run dev` lancé dans `ui/` pour le rechargement automatique).
 
 Tests : `.venv\Scripts\python -m pytest` à la racine, `npm test` dans `ui/`.
+Tests lents, sur demande : `-m corpus` (vraies partitions de `tests/corpus/` ou `test/corpus/`)
+et `-m external` (vrais Audiveris et Tesseract).
+
+### Programmes externes (reconnaissance)
+
+- Audiveris 5.11 : `winget install audiveris.org.Audiveris`
+- Tesseract 5 : `winget install UB-Mannheim.TesseractOCR`
+- Langues de Tesseract `eng`, `fra`, `nld`, `deu`, version **standard** de
+  https://github.com/tesseract-ocr/tessdata (pas « best » ni « fast », qu'Audiveris
+  ne sait pas utiliser), à copier dans `%LOCALAPPDATA%\RECOmuse\tessdata`.
+
+Les emplacements peuvent être imposés par les variables `RECOMUSE_AUDIVERIS`,
+`RECOMUSE_TESSERACT` et `RECOMUSE_TESSDATA`.
+
+Essais à la main : `python -m recomuse.importer fichier.pdf` (import seul) et
+`python -m recomuse.recognition fichier.pdf --pages 1-2` (import + reconnaissance).
 
 Sur macOS, remplacer `py -3.12` par `python3.12` et `.venv\Scripts\python` par `.venv/bin/python`.
 
