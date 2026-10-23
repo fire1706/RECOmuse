@@ -66,6 +66,7 @@ def _measure(ident: str, source, content: VectorStaff, page: int, system: int,
                   staff.bottom - staff.top + 2 * il),
         printed_number=source.printed_number,
         expected_duration=fraction_text(source.expected_duration),
+        marks=list(source.marks),
     )
     # Mesure de durée incorrecte : un symbole y est sans doute mal lu. Une première mesure
     # plus courte est une levée : elle est normale.

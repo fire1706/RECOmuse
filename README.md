@@ -40,8 +40,10 @@ Les emplacements peuvent être imposés par les variables `RECOMUSE_AUDIVERIS`,
 Essais à la main : `python -m recomuse.importer fichier.pdf` (import seul),
 `python -m recomuse.recognition fichier.pdf --pages 1-2` (import + reconnaissance),
 `python -m recomuse.vector fichier.pdf --pages 1 --notes` (lecture vectorielle) et
-`python -m recomuse.model fichier.pdf --pages 1-2` (modèle interne complet) et
-`python -m recomuse.validation fichier.pdf --pages 1-2 [--audiveris]` (validateur).
+`python -m recomuse.model fichier.pdf --pages 1-2` (modèle interne complet),
+`python -m recomuse.validation fichier.pdf --pages 1-2 [--audiveris]` (validateur) et
+`python -m recomuse.validation parties.pdf [autre.pdf...] --compare` (séparation des
+parties d'un même PDF, puis comparaison des parties d'un même morceau).
 
 Sur macOS, remplacer `py -3.12` par `python3.12` et `.venv\Scripts\python` par `.venv/bin/python`.
 

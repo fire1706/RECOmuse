@@ -108,6 +108,10 @@ MUSICXML = """<?xml version="1.0" encoding="UTF-8"?>
       <note default-x="225"><rest/><duration>4</duration><voice>1</voice><type>half</type></note>
     </measure>
     <measure number="2">
+      <direction placement="above"><direction-type><rehearsal>B</rehearsal></direction-type></direction>
+      <direction placement="above"><direction-type><words>C</words></direction-type></direction>
+      <direction placement="below"><direction-type><words>I</words></direction-type></direction>
+      <direction placement="above"><direction-type><words>rit.</words></direction-type></direction>
       <note default-x="50"><pitch><step>B</step><alter>-1</alter><octave>4</octave></pitch>
         <duration>3</duration><voice>1</voice><type>quarter</type><dot/>
         <time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>
@@ -187,6 +191,8 @@ def test_audiveris_values(tmp_path):
     assert tuplet_note.value["duration"] == "3/2"
     assert first.expected_duration == "4"
     assert first.page == 3
+    # Lettres de répétition : <rehearsal>, ou court texte en majuscules AU-DESSUS.
+    assert first.marks == [] and second.marks == ["B", "C"]
 
 
 def test_audiveris_positions_and_confidence(tmp_path):

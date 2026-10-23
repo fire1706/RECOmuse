@@ -45,6 +45,9 @@ NOTE_ACCIDENTAL_DISTANCE = 1.6
 
 # Largeur minimale d'une mesure, en interlignes.
 MIN_MEASURE_WIDTH = 2.0
+# Une portion vide de début de ligne plus étroite que ceci (clé, armure et chiffrage avant une
+# barre de reprise) n'est pas une mesure ; au-delà, c'est une vraie mesure, peut-être mal lue.
+MAX_PREFIX_WIDTH = 8.0
 
 # Écart toléré entre la position mesurée d'un symbole et une ligne / un interligne.
 POSITION_TOLERANCE = 0.3
@@ -137,6 +140,7 @@ class Measure:
     printed_number: int | None = None    # numéro de mesure imprimé
     symbols: list[str] = field(default_factory=list)  # nuances, articulations, coda...
     texts: list[str] = field(default_factory=list)
+    marks: list[str] = field(default_factory=list)    # lettres de répétition (A, B, C...)
     expected_duration: Fraction | None = None   # durée d'après le chiffrage en vigueur
     voices: int = 1
     open_end: bool = False               # fin de ligne sans barre de mesure
@@ -309,6 +313,10 @@ def _is_multirest_bar(shape: Shape, staff: Staff) -> bool:
 
 _DIGITS_ONLY = re.compile(r"^\d{1,4}$")
 
+# Lettre de répétition : une ou deux majuscules, éventuellement suivies d'un chiffre
+# (A, B, AA, A1), écrite AU-DESSUS de la portée (en dessous, ce serait une parole : « I »).
+REHEARSAL_MARK = re.compile(r"^[A-Z]{1,2}\d?$")
+
 
 # État de chaque partie (rang de portée) qui se poursuit d'un système et d'une page à
 # l'autre : clé, armure, chiffrage, liaisons qui sortent en fin de ligne.
@@ -384,7 +392,15 @@ def interpret_page(prims: PagePrimitives, page_number: int,
     for text in prims.texts:
         center_x, center_y = (text.x0 + text.x1) / 2, (text.y0 + text.y1) / 2
         index = _nearest_staff(staves, center_x, center_y)
-        measure = measure_at(index, text.x0) if index is not None else None
+        if index is None:
+            measure = None
+        elif REHEARSAL_MARK.match(text.text) and contents[index].measures:
+            # Une lettre de répétition est posée sur la barre où commence sa mesure, centrée
+            # dessus ou juste à gauche selon le logiciel de gravure : c'est la mesure dont
+            # le début est le plus proche.
+            measure = min(contents[index].measures, key=lambda m: abs(m.x0 - center_x))
+        else:
+            measure = measure_at(index, text.x0)
         if measure is not None:
             _attach_text(measure, text, staves[index])
         elif text.y1 >= first_top:
@@ -430,8 +446,28 @@ def interpret_page(prims: PagePrimitives, page_number: int,
     for system in systems:
         for rank, content in enumerate(system):
             _interpret_staff(content, states.setdefault(rank, new_part_state()), page)
+        _share_multirest_counts(system)
+    # Le nombre a pu être retrouvé sur une autre portée du système : l'avertissement tombe.
+    if not any(m.is_multirest and m.multirest is None
+               for system in systems for content in system for m in content.measures):
+        warnings = [w for w in warnings if w != "multirest_count_missing"]
 
     return VectorPage(page_number, systems, header_lines, free_texts, sorted(set(warnings)))
+
+
+def _share_multirest_counts(system: list[StaffContent]) -> None:
+    """Pause multiple d'un instrument à plusieurs portées (piano) : le nombre n'est écrit
+    qu'au-dessus de la portée du haut. Les autres portées du système le reprennent."""
+    for content in system:
+        for measure in content.measures:
+            if not measure.is_multirest or measure.multirest is not None:
+                continue
+            middle = (measure.x0 + measure.x1) / 2
+            measure.multirest = next(
+                (other.multirest for staff in system if staff is not content
+                 for other in staff.measures
+                 if other.is_multirest and other.multirest and other.x0 <= middle < other.x1),
+                None)
 
 
 def _key_signature(accidentals: list[Glyph], heads: list[Glyph], first_event: float,
@@ -495,6 +531,8 @@ def _attach_text(measure: Measure, text: TextLine, staff: Staff) -> None:
     near_start = text.x0 <= measure.x0 + 3 * staff.interline
     if _DIGITS_ONLY.match(text.text) and above and near_start and measure.printed_number is None:
         measure.printed_number = int(text.text)
+    elif above and REHEARSAL_MARK.match(text.text):
+        measure.marks.append(text.text)
     elif _DIGITS_ONLY.match(text.text) and staff.vertical_distance(
             (text.y0 + text.y1) / 2) <= TUPLET_MARK_DISTANCE * staff.interline:
         measure.digit_marks.append(((text.x0 + text.x1) / 2, int(text.text)))
@@ -614,9 +652,15 @@ def _interpret_staff(content: StaffContent, state: dict, page: _Page) -> None:
 
     # Rappel de fin de ligne : pas une mesure.
     last = content.measures[-1] if content.measures else None
-    if last is not None and last.open_end and not (
-            last.notes or last.rests or last.is_multirest or last.measure_repeat):
+    if last is not None and last.open_end and _is_empty(last):
         content.measures.pop()
+    # Début de ligne avec une barre de reprise : la portion étroite entre la clé et la barre
+    # (clé, armure, chiffrage seulement) n'est pas une mesure. Elle rejoint la suivante.
+    first = content.measures[0] if len(content.measures) > 1 else None
+    if (first is not None and _is_empty(first)
+            and first.x1 - first.x0 < MAX_PREFIX_WIDTH * staff.interline):
+        _merge_prefix(first, content.measures[1])
+        content.measures.pop(0)
 
     # Liaisons qui sortent en fin de ligne : la note d'arrivée, au début de la ligne
     # suivante, gardera la même altération.
@@ -624,6 +668,22 @@ def _interpret_staff(content: StaffContent, state: dict, page: _Page) -> None:
         (n.step, n.octave): n.alter
         for m in content.measures[-1:] for n in m.notes if n.tie_start and n.step
     }
+
+
+def _merge_prefix(prefix: Measure, measure: Measure) -> None:
+    """Reporte sur `measure` ce qui est écrit dans la portion de début de ligne `prefix`."""
+    measure.x0 = prefix.x0
+    if measure.clef is None:
+        measure.clef, measure.clef_position = prefix.clef, prefix.clef_position
+    if measure.key_fifths is None:
+        measure.key_fifths = prefix.key_fifths
+    measure.time_signature = measure.time_signature or prefix.time_signature
+    measure.printed_number = measure.printed_number or prefix.printed_number
+
+
+def _is_empty(measure: Measure) -> bool:
+    """Vrai si la mesure ne contient rien qui compte comme de la musique."""
+    return not (measure.notes or measure.rests or measure.is_multirest or measure.measure_repeat)
 
 
 def _read_rhythms(measure: Measure, heads: list[Glyph], rests: list[Glyph],

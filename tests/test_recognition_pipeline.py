@@ -105,6 +105,9 @@ def test_vector_pdf_header_is_read_from_the_pdf_text(tmp_path, monkeypatch, fake
     assert result.header.tempo == "Allegro"
     assert result.header.composers == ["arr. J. Dupont"]
     assert "ocr_unavailable" not in result.warnings
+    # L'en-tête de chaque page de musique est gardé (pour séparer les parties d'un PDF).
+    assert list(result.page_headers) == [1]
+    assert result.page_headers[1].instrument == "Flute 1"
     # La lecture vectorielle a trouvé les 6 systèmes de 4 mesures.
     assert result.vector is not None
     assert result.vector.measure_count() == 24

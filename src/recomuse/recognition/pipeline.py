@@ -59,6 +59,9 @@ class RecognitionResult:
     header_lines: list[OcrLine] = field(default_factory=list)
     warnings: list[RecognitionWarning] = field(default_factory=list)
     vector: VectorScore | None = None      # lecture directe des pages vectorielles
+    # En-tête de chaque page de musique (n° de page → titre, instrument...) : un PDF peut
+    # contenir plusieurs parties à la suite (voir model/split.py).
+    page_headers: dict[int, HeaderInfo] = field(default_factory=dict)
 
     @property
     def measure_count(self) -> int:
@@ -117,25 +120,18 @@ def recognize_score(score: ImportedScore, on_progress: ProgressCallback | None =
         vector = read_vector_pdf(score.source_path, pdf_vector_pages)
     read_by_vector = {p.page_number for p in vector.pages if p.systems} if vector else set()
 
-    # 2. En-tête de la première page de musique : texte exact du PDF si possible.
-    first_music_page = music_pages[0]
-    header_lines: list[OcrLine] = []
-    header = HeaderInfo()
-    vector_page = next((p for p in vector.pages if p.page_number == first_music_page.page_number),
-                       None) if vector else None
-    if vector_page is not None:
-        header_lines = lines_from_pdf_text(vector_page.header_lines)
-        header = analyze_header(header_lines, first_music_page.width)
-    elif status.tesseract and status.tessdata:
-        try:
-            header_lines = read_header(status.tesseract, status.tessdata,
-                                       first_music_page.image_path,
-                                       first_music_page.interline, output_dir)
-            header = analyze_header(header_lines, first_music_page.width)
-        except OcrError:
-            warnings.append("ocr_failed")
-    else:
-        warnings.append("ocr_unavailable")
+    # 2. En-tête de chaque page de musique : texte exact du PDF si possible, sinon Tesseract.
+    page_headers: dict[int, HeaderInfo] = {}
+    first_lines: list[OcrLine] = []
+    for page in music_pages:
+        lines = _page_header_lines(page, vector, status, output_dir, warnings)
+        if lines is None:
+            continue
+        page_headers[page.page_number] = analyze_header(lines, page.width)
+        if page is music_pages[0]:
+            first_lines = lines
+    header_lines = first_lines
+    header = page_headers.get(music_pages[0].page_number, HeaderInfo())
 
     # 3. Audiveris, pour les pages que la lecture vectorielle n'a pas lues.
     for_audiveris = [p for p in music_pages
@@ -154,4 +150,26 @@ def recognize_score(score: ImportedScore, on_progress: ProgressCallback | None =
         on_progress(1, 1)
 
     return RecognitionResult(run=run, movements=movements, header=header,
-                             header_lines=header_lines, warnings=warnings, vector=vector)
+                             header_lines=header_lines, warnings=warnings, vector=vector,
+                             page_headers=page_headers)
+
+
+def _page_header_lines(page, vector: VectorScore | None, status, output_dir: Path,
+                       warnings: list) -> list[OcrLine] | None:
+    """Lignes de l'en-tête d'une page : texte exact (page vectorielle) ou Tesseract.
+    None si on ne peut pas les lire."""
+    vector_page = next((p for p in vector.pages if p.page_number == page.page_number),
+                       None) if vector else None
+    if vector_page is not None:
+        return lines_from_pdf_text(vector_page.header_lines)
+    if not (status.tesseract and status.tessdata):
+        if "ocr_unavailable" not in warnings:
+            warnings.append("ocr_unavailable")
+        return None
+    try:
+        return read_header(status.tesseract, status.tessdata, page.image_path, page.interline,
+                           output_dir)
+    except OcrError:
+        if "ocr_failed" not in warnings:
+            warnings.append("ocr_failed")
+        return None

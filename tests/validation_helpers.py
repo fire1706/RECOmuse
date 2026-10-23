@@ -56,9 +56,10 @@ def attribute(ident: str, kind: str, source: str = "audiveris", confidence: floa
                   confidence=confidence, bbox=None)
 
 
-def measure(ident: str, events=(), attributes=(), expected: str | None = "4", **fields) -> Measure:
-    return Measure(id=ident, number=0, page=1, attributes=list(attributes), events=list(events),
-                   expected_duration=expected, **fields)
+def measure(ident: str, events=(), attributes=(), expected: str | None = "4", page: int = 1,
+            **fields) -> Measure:
+    return Measure(id=ident, number=0, page=page, attributes=list(attributes),
+                   events=list(events), expected_duration=expected, **fields)
 
 
 def model_of(measures: list[Measure], image: Path | None = None, name: str | None = None,

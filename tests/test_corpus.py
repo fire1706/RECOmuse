@@ -170,3 +170,41 @@ def test_validator_catches_audiveris_errors(tmp_path, monkeypatch):
     assert "time_signature_missing" in codes
     # Pauses multiples de 12 et 8 mesures lues comme des mesures vides.
     assert len(report.by_code("multirest_missed")) == 2
+
+
+# Tâche 7 : PDF contenant toutes les parties d'un morceau. Nombre de parties trouvées,
+# longueur habituelle, et écarts attendus (partie, code, correction proposée).
+GROUPED_PARTS = {
+    "blues_on_the_hill--": (16, 156, []),
+    # Ténor 1 : pause de 8 mesures dessinée avec un signe inhabituel, lue comme une mesure.
+    # Trompette 2 : une pause d'une mesure là où les autres parties en ont deux.
+    "throwin_down": (17, 109, [("Tenor Saxophone 1", "part_measures_missing", 8),
+                               ("Trumpet in B 2", "part_measures_missing", 2)]),
+}
+
+
+@pytest.mark.parametrize("prefix", sorted(GROUPED_PARTS))
+def test_grouped_parts_are_split_and_compared(tmp_path, monkeypatch, prefix):
+    from recomuse.importer import import_score
+    from recomuse.model.build import build_model
+    from recomuse.model.split import split_parts
+    from recomuse.recognition import recognize_score, tools
+    from recomuse.validation.comparison import compare_parts, part_refs
+
+    matches = [p for p in corpus_pdfs() if p.name.startswith(prefix)]
+    if not matches:
+        pytest.skip(f"{prefix} absent du corpus")
+    status = tools.check_tools()
+    monkeypatch.setattr(tools, "check_tools", lambda: tools.ToolsStatus(
+        audiveris=None, tesseract=None, tessdata=None, languages=[],
+        missing_languages=status.missing_languages))
+    score = import_score(matches[0], tmp_path / "work")
+    recognition = recognize_score(score)
+    models = split_parts(build_model(score, recognition), recognition.page_headers)
+    refs = part_refs(models)
+    count, usual, expected = GROUPED_PARTS[prefix]
+    assert len(refs) == count
+    report = compare_parts(refs)
+    found = [(i.part_id, i.code, i.action.get("set_multirest")) for i in report.issues]
+    assert found == expected
+    assert all(i.details["usual_length"] == usual for i in report.issues)

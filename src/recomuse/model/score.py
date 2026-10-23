@@ -78,6 +78,7 @@ class Measure:
     attributes: list[Symbol] = field(default_factory=list)
     events: list[Symbol] = field(default_factory=list)       # notes et silences, dans l'ordre
     expected_duration: str | None = None          # d'après le chiffrage en vigueur (« 3 »)
+    marks: list[str] = field(default_factory=list)  # lettres de répétition (A, B...)
 
     @property
     def length(self) -> int:

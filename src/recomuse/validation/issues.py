@@ -20,6 +20,10 @@ IssueCode = Literal[
     "multirest_count_unknown",   # pause multiple dont le nombre n'a pas été lu
     "measure_number_mismatch",   # numérotation calculée ≠ numéro de mesure imprimé
     "note_out_of_range",         # note hors de la tessiture de l'instrument
+    # Comparaison entre les parties d'un même morceau (comparison.py) :
+    "part_measures_missing",     # mesures en moins par rapport aux autres parties
+    "part_measures_extra",       # mesures en trop par rapport aux autres parties
+    "part_time_signature_differs",  # chiffrage différent de celui des autres parties
 ]
 
 Severity = Literal["error", "warning", "info"]

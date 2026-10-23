@@ -1,5 +1,6 @@
 """Tests de l'interprétation d'une page vectorielle (pages fabriquées, voir vector_builder)."""
 
+from recomuse.vector.primitives import VLine
 from recomuse.vector.reader import interpret_page
 
 from vector_builder import (
@@ -236,6 +237,51 @@ def test_texts_header_and_measure_numbers():
     assert [t.text for t in vector.header_lines] == ["MARCHE D'ACOZ", "Flûte 1", "5", "Allegro"]
     assert bars[1].printed_number == 5
     assert bars[0].texts == ["Allegro"]
+
+
+def test_rehearsal_marks_belong_to_the_measure_starting_at_their_barline():
+    """Une lettre de répétition est posée sur la barre : centrée dessus ou juste à gauche,
+    elle appartient à la mesure qui commence là. Un mot ordinaire n'en est pas une."""
+    page = part_page()
+    page.text("A", 190, 85, 198, 95)         # juste à gauche de la barre x = 200
+    page.text("B2", 345, 85, 357, 95)        # centrée sur la barre x = 350
+    page.text("Solo", 380, 85, 400, 95)
+    _, bars = measures(page)
+    assert [b.marks for b in bars] == [[], ["A"], ["B2"]]
+    assert bars[2].texts == ["Solo"]
+
+
+def test_line_start_before_a_repeat_barline_is_not_a_measure():
+    """Début de ligne « clé, armure | : » : la portion étroite avant la barre de reprise
+    rejoint la mesure suivante (sa clé et son chiffrage aussi)."""
+    page = part_page(barlines=(85, 200, 550))
+    page.note(0, 130, 4)
+    _, bars = measures(page)
+    assert len(bars) == 2
+    assert bars[0].x0 == 50
+    assert bars[0].clef == "treble" and bars[0].time_signature == "3/4"
+    assert len(bars[0].notes) == 1
+
+
+def test_multirest_count_is_shared_by_the_staves_of_a_piano():
+    """Pause multiple sur les deux portées du piano : le nombre n'est écrit qu'en haut."""
+    page = PageBuilder()
+    page.staff(100, barlines=[])
+    page.staff(140, barlines=[])
+    for x in (200, 550):                     # barres communes aux deux portées : un système
+        page.vlines.append(VLine(x, 100, 160, 0.5))
+    page.glyph(0, TREBLE, 55, 2)
+    page.glyph(1, BASS, 55, 6)
+    page.note(0, 120, 4)
+    page.note(1, 120, 4)
+    page.shape(220, 108, 530, 112)           # barre épaisse, portée du haut
+    page.text("8", 370, 85, 376, 95)         # le nombre, au-dessus
+    page.shape(220, 148, 530, 152)           # barre épaisse, portée du bas, sans nombre
+    vector = interpret_page(page.build(), 1)
+    upper, lower = vector.systems[0]
+    assert upper.measures[1].multirest == 8
+    assert lower.measures[1].is_multirest and lower.measures[1].multirest == 8
+    assert "multirest_count_missing" not in vector.warnings
 
 
 def test_glyphs_left_of_the_staff_are_ignored():

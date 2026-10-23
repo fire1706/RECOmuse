@@ -8,6 +8,7 @@ Fichiers du module :
 - omr.py            : lecture du projet d'Audiveris (.omr) : positions et confiances ;
 - from_audiveris.py : construction depuis le MusicXML d'Audiveris + le .omr ;
 - build.py          : assemblage, page par page (build_model) ;
+- split.py          : séparation des parties d'un PDF qui les contient toutes (split_parts) ;
 - store.py          : enregistrement dans la base locale ;
 - snippets.py       : découpe des extraits d'image.
 

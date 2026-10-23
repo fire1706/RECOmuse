@@ -21,6 +21,7 @@ from recomuse.model.score import Measure, Symbol, fraction_text
 from recomuse.recognition.musicxml import read_root
 from recomuse.recognition.pipeline import RecognitionResult
 from recomuse.vector import pitch
+from recomuse.vector.reader import REHEARSAL_MARK
 
 # Pénalité (en pixels) par demi-interligne d'écart entre la hauteur attendue d'une note et
 # celle de la tête du .omr, pour l'appariement.
@@ -217,6 +218,7 @@ def _read_part(part: ET.Element, movement: int, part_index: int, omr_measures: l
                 s.kind == "multirest" for s in measure.attributes):
             _attribute(measure, geometry, "multirest", {"count": omr_measure.multirest_count}, 0)
         measure.expected_duration = fraction_text(expected)
+        measure.marks = _rehearsal_marks(element)
 
         # Notes et silences.
         chord_leader: Symbol | None = None
@@ -234,6 +236,20 @@ def _read_part(part: ET.Element, movement: int, part_index: int, omr_measures: l
             symbol.value.pop("_x", None)
         measures.append(measure)
     return measures
+
+
+def _rehearsal_marks(element: ET.Element) -> list[str]:
+    """Lettres de répétition d'une mesure du MusicXML (<rehearsal>, ou court texte au-dessus)."""
+    marks = []
+    for direction in element.findall("direction"):
+        for item in direction.iter():
+            text = (item.text or "").strip()
+            rehearsal = item.tag == "rehearsal" and text
+            short_above = (item.tag == "words" and direction.get("placement") != "below"
+                           and REHEARSAL_MARK.match(text))
+            if rehearsal or short_above:
+                marks.append(text)
+    return marks
 
 
 def _int(text: str | None) -> int | None:

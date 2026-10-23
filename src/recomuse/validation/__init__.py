@@ -1,5 +1,6 @@
 """Validateur musical : durées de mesure, octave recalculée depuis la position sur la portée,
-pauses multiples, numéros de mesure imprimés, tessiture de l'instrument.
+pauses multiples, numéros de mesure imprimés, tessiture de l'instrument, comparaison entre
+les parties d'un même morceau.
 
 Fichiers du module :
 - issues.py     : les problèmes trouvés (codes, corrections proposées) et le rapport ;
@@ -8,14 +9,17 @@ Fichiers du module :
 - pitches.py    : clé octaviée suspecte, hauteur d'après la position des têtes ;
 - numbering.py  : pauses multiples, numéros de mesure imprimés ;
 - ranges.py     : tessiture des instruments (table instruments/instruments.json) ;
-- validator.py  : tous les contrôles (validate) et application des corrections.
+- validator.py  : tous les contrôles d'une partie (validate), application des corrections ;
+- comparison.py : comparaison entre les parties d'un même morceau (compare_parts) :
+                  mesures en trop ou en moins, chiffrages différents.
 
-La comparaison entre les parties d'un même morceau viendra à la tâche 7.
-
-Essai à la main :  python -m recomuse.validation partition.pdf --pages 1-2 [--audiveris]
+Essais à la main :  python -m recomuse.validation partition.pdf --pages 1-2 [--audiveris]
+                    python -m recomuse.validation parties.pdf [autre.pdf...] --compare
 """
 
+from recomuse.validation.comparison import compare_parts, part_refs
 from recomuse.validation.issues import Fix, Issue, ValidationReport
 from recomuse.validation.validator import apply_fixes, validate
 
-__all__ = ["Fix", "Issue", "ValidationReport", "apply_fixes", "validate"]
+__all__ = ["Fix", "Issue", "ValidationReport", "apply_fixes", "compare_parts", "part_refs",
+           "validate"]
