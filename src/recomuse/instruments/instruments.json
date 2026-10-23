@@ -1,0 +1,22 @@
+{
+  "_description": "Table des instruments de RECOmuse (fichier modifiable). Pour chaque instrument : les noms sous lesquels il apparaît sur les parties (français, néerlandais, anglais, allemand ; en minuscules, sans accents), et son étendue ÉCRITE (telle que sur la partie) selon la clé : la note la plus grave et la plus aiguë raisonnables. Les étendues sont larges exprès : le validateur ne signale que les notes vraiment hors de portée, presque toujours une erreur d'octave. La transposition sera ajoutée à la tâche 10. L'ordre compte : le premier instrument dont un nom est trouvé l'emporte (« clarinette basse » avant « clarinette »).",
+  "instruments": [
+    {"id": "piccolo", "names": ["piccolo", "petite flute", "kleine fluit"], "ranges": {"G": ["C4", "C7"]}},
+    {"id": "flute", "names": ["flute", "fluit", "flote", "flauto"], "ranges": {"G": ["B3", "D7"]}},
+    {"id": "oboe", "names": ["oboe", "hautbois", "hobo"], "ranges": {"G": ["Bb3", "A6"]}},
+    {"id": "bassoon", "names": ["bassoon", "basson", "fagot", "fagott"], "ranges": {"F": ["Bb1", "E5"], "C": ["Bb1", "E5"]}},
+    {"id": "eb_clarinet", "names": ["eb clarinet", "es klarinet", "klarinette in es", "petite clarinette", "clarinette mib", "clarinet in eb", "eb cl"], "ranges": {"G": ["E3", "C7"]}},
+    {"id": "alto_clarinet", "names": ["alto clarinet", "clarinette alto", "altklarinette", "alt klarinet"], "ranges": {"G": ["E3", "C6"]}},
+    {"id": "bass_clarinet", "names": ["bass clarinet", "clarinette basse", "basklarinet", "bassklarinette", "b cl"], "ranges": {"G": ["C3", "G6"]}},
+    {"id": "clarinet", "names": ["clarinet", "clarinette", "klarinet", "klarinette", "cl"], "ranges": {"G": ["D3", "C7"]}},
+    {"id": "saxophone", "names": ["saxophone", "saxofoon", "saxophon", "sax"], "ranges": {"G": ["A3", "A6"]}},
+    {"id": "flugelhorn", "names": ["flugelhorn", "bugle", "bugel", "flugel"], "ranges": {"G": ["E3", "E6"]}},
+    {"id": "trumpet", "names": ["trumpet", "trompette", "trompet", "trompete", "cornet", "kornet", "cornetto"], "ranges": {"G": ["E3", "E6"]}},
+    {"id": "alto_horn", "names": ["alto horn", "saxhorn alto", "althoorn", "tenor horn", "tenorhorn", "alto"], "ranges": {"G": ["F#3", "C6"]}},
+    {"id": "horn", "names": ["horn", "cor", "hoorn", "corno"], "ranges": {"G": ["C3", "C6"], "F": ["F1", "C4"]}},
+    {"id": "bass_trombone", "names": ["bass trombone", "trombone basse", "bastrombone", "bassposaune"], "ranges": {"F": ["Bb1", "D5"]}},
+    {"id": "trombone", "names": ["trombone", "posaune", "trombon"], "ranges": {"F": ["E2", "F5"], "C": ["E2", "F5"], "G": ["F#3", "D6"]}},
+    {"id": "euphonium", "names": ["euphonium", "baritone", "bariton", "baryton", "saxhorn basse"], "ranges": {"G": ["E3", "D6"], "F": ["Bb1", "D5"]}},
+    {"id": "tuba", "names": ["tuba", "bass", "basse", "contrebasse", "sousaphone", "bas"], "ranges": {"G": ["E3", "C6"], "F": ["D1", "G4"]}}
+  ]
+}

@@ -30,8 +30,9 @@ recomuse = "recomuse.app:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-# Le schéma SQL est un fichier de données livré avec le paquet.
+# Fichiers de données livrés avec le paquet : schéma SQL, table des instruments.
 "recomuse.storage" = ["*.sql"]
+"recomuse.instruments" = ["*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -50,4 +51,4 @@ target-version = "py312"
 
 [tool.ruff.lint.isort]
 # Outils de test locaux (tests/synthetic.py, tests/vector_builder.py), rangés après les imports du projet.
-known-local-folder = ["synthetic", "vector_builder"]
+known-local-folder = ["synthetic", "vector_builder", "validation_helpers"]

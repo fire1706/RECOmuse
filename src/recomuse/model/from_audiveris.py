@@ -5,7 +5,9 @@ Appariement MusicXML ↔ .omr, mesure par mesure :
 - les mesures du MusicXML se suivent dans l'ordre des systèmes indiqués par Audiveris
   (champ « source-sheet-N » du mouvement) ; celles du .omr aussi : on les associe une à une ;
 - dans une mesure, chaque note du MusicXML a une abscisse « default-x » (en dixièmes
-  d'interligne depuis le début de la mesure) : on prend l'accord du .omr le plus proche ;
+  d'interligne depuis le début de la mesure) : on prend l'accord du .omr le plus proche,
+  en abscisse ET en hauteur (Audiveris peut voir deux « têtes » à la même abscisse, par
+  exemple une vraie tête et un crochet pris pour une tête) ;
 - dans un accord, les têtes sont associées aux notes de la plus grave à la plus aiguë.
 Une note sans correspondant garde une confiance de 0,5 et la boîte de sa mesure.
 """
@@ -18,6 +20,11 @@ from recomuse.model.omr import OmrChord, OmrMeasure, OmrSheet, read_sheet
 from recomuse.model.score import Measure, Symbol, fraction_text
 from recomuse.recognition.musicxml import read_root
 from recomuse.recognition.pipeline import RecognitionResult
+from recomuse.vector import pitch
+
+# Pénalité (en pixels) par demi-interligne d'écart entre la hauteur attendue d'une note et
+# celle de la tête du .omr, pour l'appariement.
+PITCH_PENALTY = 40
 
 # Confiance d'un symbole sans correspondant dans le .omr.
 UNKNOWN_CONFIDENCE = 0.5
@@ -31,7 +38,8 @@ TYPE_VALUE = {"breve": Fraction(8), "whole": Fraction(4), "half": Fraction(2),
 HEAD_OF_TYPE = {"whole": "whole", "half": "half", "breve": "breve"}
 
 # Type de symbole du .omr pour chaque attribut.
-ATTRIBUTE_KINDS = {"clef": ("clef",), "key": ("key",), "time": ("time-pair", "time-whole")}
+ATTRIBUTE_KINDS = {"clef": ("clef",), "key": ("key",), "time": ("time-pair", "time-whole"),
+                   "multirest": ("multiple-rest",)}
 
 
 @dataclass
@@ -40,7 +48,7 @@ class _Geometry:
 
     page: int
     scale: float                 # agrandissement de la feuille (diviser les pixels par lui)
-    px_per_tenth: float          # pixels de la feuille par dixième d'interligne MusicXML
+    px_per_tenth: float          # pixels de la feuille par dixième MusicXML, dans cette mesure
     omr: OmrMeasure | None
     used: set[str] = field(default_factory=set)
 
@@ -48,11 +56,17 @@ class _Geometry:
         return tuple(round(v / self.scale, 1) for v in bounds)
 
     def measure_box(self) -> tuple[float, float, float, float] | None:
-        if self.omr is None or not self.omr.chords:
+        """Colonne de la mesure, de la portée (ou de ses accords) en hauteur."""
+        if self.omr is None:
             return None
-        xs = [c.symbol.bounds for c in self.omr.chords]
-        top = min(b[1] for b in xs)
-        bottom = max(b[1] + b[3] for b in xs)
+        tops = [c.symbol.bounds[1] for c in self.omr.chords]
+        bottoms = [c.symbol.bounds[1] + c.symbol.bounds[3] for c in self.omr.chords]
+        if self.omr.staff_top is not None:
+            tops.append(self.omr.staff_top)
+            bottoms.append(self.omr.staff_bottom)
+        if not tops:
+            return None
+        top, bottom = min(tops), max(bottoms)
         return self.box((self.omr.left, top, self.omr.right - self.omr.left, bottom - top))
 
 
@@ -75,21 +89,72 @@ def build_parts(result: RecognitionResult) -> list[list[Measure]]:
         located = []
         for sheet_number in sorted(movement.sheet_systems):
             omr = sheet(sheet_number)
+            order = sorted(omr.systems, key=int) if omr else []
             for system_id in movement.sheet_systems[sheet_number]:
                 systems = omr.systems.get(str(system_id), []) if omr else []
-                located.append((sheet_number, omr, systems))
+                rank = order.index(str(system_id)) if str(system_id) in order else None
+                located.append((sheet_number, omr, systems, rank))
         for part_index, part in enumerate(root.findall("part")):
             while len(parts) <= part_index:
                 parts.append([])
-            omr_measures = []
-            for sheet_number, omr, systems in located:
-                part_measures = systems[part_index] if part_index < len(systems) else []
-                for omr_measure in part_measures or [None]:
-                    omr_measures.append((sheet_number, omr, omr_measure))
+            omr_measures = _align(part, part_index, located)
             default_sheet = located[0][0] if located else 1
             parts[part_index] += _read_part(part, movement_index, part_index, omr_measures,
                                             default_sheet, book, page_width)
     return parts
+
+
+def _system_breaks(part: ET.Element) -> list[list[ET.Element]]:
+    """Mesures du MusicXML regroupées par système (marques <print new-system="yes"/>)."""
+    systems: list[list[ET.Element]] = []
+    for measure in part.findall("measure"):
+        mark = measure.find("print")
+        new = mark is not None and "yes" in (mark.get("new-system"), mark.get("new-page"))
+        if new or not systems:
+            systems.append([])
+        systems[-1].append(measure)
+    return systems
+
+
+def _align(part: ET.Element, part_index: int, located: list) -> list:
+    """Mesure du .omr (avec sa feuille) qui correspond à chaque mesure du MusicXML.
+
+    Système par système : le k-ième système du MusicXML va avec le k-ième système du .omr.
+    Dans un système, les deux ne comptent pas toujours le même nombre de mesures (le .omr
+    garde par exemple la colonne d'un rappel d'armure en fin de ligne) : chaque mesure du
+    MusicXML est placée d'après sa position relative dans le système (largeurs « width »),
+    et associée à la colonne du .omr qui se trouve à la même position relative.
+    """
+    xml_systems = _system_breaks(part)
+    result = []
+    if len(xml_systems) != len(located):
+        # Découpages incompatibles : association une à une, dans l'ordre.
+        flat = [(sheet, omr, m, rank) for sheet, omr, systems, rank in located
+                for m in (systems[part_index] if part_index < len(systems) else [])]
+        for index, _ in enumerate(part.findall("measure")):
+            result.append(flat[index] if index < len(flat) else (None, None, None, None))
+        return result
+
+    for xml_measures, (sheet, omr, systems, rank) in zip(xml_systems, located, strict=True):
+        columns = systems[part_index] if part_index < len(systems) else []
+        widths = [_float(m.get("width")) or 1.0 for m in xml_measures]
+        total = sum(widths)
+        if not columns:
+            result += [(sheet, omr, None, rank)] * len(xml_measures)
+            continue
+        if len(columns) == len(xml_measures):
+            # Même nombre de mesures des deux côtés : association une à une.
+            result += [(sheet, omr, column, rank) for column in columns]
+            continue
+        left, right = columns[0].left, columns[-1].right
+        done = 0.0
+        for width in widths:
+            center = left + (done + width / 2) / total * (right - left)
+            done += width
+            column = min(columns, key=lambda c: 0 if c.left <= center < c.right
+                         else min(abs(c.left - center), abs(c.right - center)))
+            result.append((sheet, omr, column, rank))
+    return result
 
 
 def _float(text: str | None) -> float | None:
@@ -104,18 +169,29 @@ def _read_part(part: ET.Element, movement: int, part_index: int, omr_measures: l
     measures = []
     divisions = 1
     expected: Fraction | None = None
+    clef: dict | None = None    # clé en vigueur (pour la hauteur attendue des têtes)
     for index, element in enumerate(part.findall("measure")):
-        sheet_number, omr, omr_measure = (omr_measures[index] if index < len(omr_measures)
-                                          else (default_sheet, None, None))
+        sheet_number, omr, omr_measure, system_rank = (
+            omr_measures[index] if index < len(omr_measures) else (default_sheet, None, None, None))
+        if sheet_number is None:
+            sheet_number = default_sheet
         sheet_index = sheet_number - 1
         page = book.sheet_pages[sheet_index] if sheet_index < len(book.sheet_pages) else None
         scale = book.sheet_scales[sheet_index] if sheet_index < len(book.sheet_scales) else 1.0
-        px_per_tenth = (omr.width / page_width) if omr and page_width else 1.0
+        # Dixièmes MusicXML → pixels : d'après la largeur de CETTE mesure (attribut « width »
+        # du MusicXML, colonne du .omr). Une échelle unique pour la page décale les notes.
+        width = _float(element.get("width"))
+        if omr_measure is not None and width:
+            px_per_tenth = (omr_measure.right - omr_measure.left) / width
+        else:
+            px_per_tenth = (omr.width / page_width) if omr and page_width else 1.0
         geometry = _Geometry(page=page, scale=scale, px_per_tenth=px_per_tenth, omr=omr_measure)
         ident = f"a{movement}.{part_index}.{index}"
-        measure = Measure(id=ident, number=0, page=page, bbox=geometry.measure_box())
+        measure = Measure(id=ident, number=0, page=page, system=system_rank,
+                          bbox=geometry.measure_box())
 
         # Attributs : division de la noire, clé, armure, chiffrage, pause multiple.
+        current_clef = clef
         for attributes in element.findall("attributes"):
             divisions = int(attributes.findtext("divisions") or divisions)
             for k, clef in enumerate(attributes.findall("clef")):
@@ -124,6 +200,7 @@ def _read_part(part: ET.Element, movement: int, part_index: int, omr_measures: l
                 if change:
                     value["octave_change"] = change
                 _attribute(measure, geometry, "clef", value, k)
+                current_clef = value
             for k, key in enumerate(attributes.findall("key")):
                 fifths = _int(key.findtext("fifths")) or 0
                 _attribute(measure, geometry, "key", {"fifths": fifths}, k)
@@ -151,7 +228,8 @@ def _read_part(part: ET.Element, movement: int, part_index: int, omr_measures: l
             else:
                 chord_leader = symbol
             measure.events.append(symbol)
-        _locate_events(measure.events, geometry)
+        clef = current_clef
+        _locate_events(measure.events, geometry, clef)
         for symbol in measure.events:
             symbol.value.pop("_x", None)
         measures.append(measure)
@@ -221,7 +299,32 @@ def _note(note: ET.Element, ident: str, divisions: int, geometry: _Geometry) -> 
                   confidence=UNKNOWN_CONFIDENCE, bbox=None)
 
 
-def _locate_events(events: list[Symbol], geometry: _Geometry) -> None:
+def _staff_pitch(symbol: Symbol, clef: dict | None) -> float | None:
+    """Hauteur attendue de la tête d'une note, à la façon d'Audiveris : 0 = ligne du milieu,
+    positif vers le bas (en demi-interlignes)."""
+    step, octave = symbol.value.get("step"), symbol.value.get("octave")
+    names = {"G": "treble", "F": "bass", "C": "c"}
+    if clef is None or step is None or octave is None or clef.get("sign") not in names:
+        return None
+    ref_step, ref_octave = pitch.CLEF_REFERENCE[names[clef["sign"]]]
+    clef_position = ((clef.get("line") or 2) - 1) * 2
+    written_octave = octave - (clef.get("octave_change") or 0)
+    position = (pitch.degree(step, written_octave) - pitch.degree(ref_step, ref_octave)
+                + clef_position)
+    return 4 - position
+
+
+def _match_cost(chord: OmrChord, x: float, wanted: float | None) -> float:
+    """Coût d'appariement d'un accord du .omr : écart horizontal en pixels, plus une forte
+    pénalité par demi-interligne d'écart de hauteur (une tête à la bonne hauteur l'emporte)."""
+    distance = abs(chord.symbol.bounds[0] - x)
+    pitches = [h.pitch for h in chord.heads if h.pitch is not None]
+    if wanted is not None and pitches:
+        distance += PITCH_PENALTY * min(abs(p - wanted) for p in pitches)
+    return distance
+
+
+def _locate_events(events: list[Symbol], geometry: _Geometry, clef: dict | None = None) -> None:
     """Donne à chaque note ou silence la boîte et la confiance de son correspondant du .omr."""
     fallback = geometry.measure_box()
     if geometry.omr is None:
@@ -246,7 +349,8 @@ def _locate_events(events: list[Symbol], geometry: _Geometry) -> None:
             for symbol in group:
                 symbol.bbox = fallback
             continue
-        chord = min(candidates, key=lambda c: abs(c.symbol.bounds[0] - x))
+        wanted = None if wanted_rest else _staff_pitch(group[0], clef)
+        chord = min(candidates, key=lambda c: _match_cost(c, x, wanted))
         free.remove(chord)
         if wanted_rest or not chord.heads:
             for symbol in group:

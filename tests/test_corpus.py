@@ -139,3 +139,34 @@ def test_model_of_a_vector_part_without_audiveris(tmp_path, monkeypatch):
     assert sum(m.length for m in model.parts[0].measures) == 109
     assert all(s.bbox is not None for s in model.symbols())
     assert model.title == "Throwin' Down" and model.instrument == "Alto Saxophone 1"
+
+
+def test_validator_catches_audiveris_errors(tmp_path, monkeypatch):
+    """Tâche 6 : la partie de saxophone alto de « Throwin' Down » lue par Audiveris (au lieu
+    de la lecture vectorielle exacte) contient les erreurs du test de faisabilité : le
+    validateur doit les trouver."""
+    from recomuse.importer import import_score
+    from recomuse.model.build import build_model
+    from recomuse.recognition import recognize_score, tools
+    from recomuse.validation import validate
+
+    matches = [p for p in corpus_pdfs() if p.name.startswith("throwin_down")]
+    status = tools.check_tools()
+    if not matches or status.audiveris is None:
+        pytest.skip("throwin_down ou Audiveris absent")
+    if status.tessdata:
+        monkeypatch.setenv("RECOMUSE_TESSDATA", str(status.tessdata))
+    score = import_score(matches[0], tmp_path / "work")
+    score.pages = [p for p in score.pages if p.page_number <= 2]
+    recognition = recognize_score(score, audiveris_for_vector_pages=True)
+    recognition.vector = None
+    model = build_model(score, recognition)
+    report = validate(model)
+
+    codes = {i.code for i in report.issues}
+    # Clé de sol lue octaviée : toute la partie une octave trop bas.
+    assert "clef_octave_suspicious" in codes
+    # Chiffrage « C » perdu.
+    assert "time_signature_missing" in codes
+    # Pauses multiples de 12 et 8 mesures lues comme des mesures vides.
+    assert len(report.by_code("multirest_missed")) == 2

@@ -37,6 +37,10 @@ STAFF_ROW_COVERAGE = 0.3
 # coupait le bas des lettres (« Allegro » lu « Allearo ») ou attrapait des bouts de notes.
 HEADER_SEARCH_INTERLINES = (0.5, 3.5)
 
+# Un nombre (numéro de mesure, pause multiple) n'est retenu que s'il est lu avec au moins
+# cette confiance : une erreur de lecture décalerait toute la numérotation.
+MIN_NUMBER_CONFIDENCE = 70
+
 # Temps maximal accordé à Tesseract pour un en-tête, en secondes.
 TESSERACT_TIMEOUT_SECONDS = 60
 
@@ -154,3 +158,34 @@ def read_header(tesseract: Path, tessdata: Path, page_image: Path, interline: in
         raise OcrError(result.stderr.decode("utf-8", errors="replace").strip())
     return parse_tsv(result.stdout.decode("utf-8", errors="replace"))
 
+
+
+def number_command(tesseract: Path, image: Path, tessdata: Path) -> list[str]:
+    """Ligne de commande de Tesseract pour lire UN nombre (numéro de mesure, pause multiple)."""
+    return [
+        str(tesseract), str(image), "stdout",
+        "--tessdata-dir", str(tessdata),
+        "-l", "eng",
+        "--psm", "8",                                  # un seul « mot » (le nombre)
+        "-c", "tessedit_char_whitelist=0123456789",    # chiffres seulement
+        "-c", "tessedit_create_tsv=1",                 # avec la confiance de chaque mot
+    ]
+
+
+def read_number(tesseract: Path, tessdata: Path, pixels: np.ndarray, work_path: Path) -> int | None:
+    """Lit un nombre dans un petit morceau d'image (None si rien de lisible)."""
+    if pixels.size == 0:
+        return None
+    write_png(work_path, pixels)
+    try:
+        result = subprocess.run(
+            number_command(tesseract, work_path, tessdata),
+            check=False, capture_output=True, timeout=TESSERACT_TIMEOUT_SECONDS,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except subprocess.TimeoutExpired:
+        return None
+    lines = parse_tsv(result.stdout.decode("utf-8", errors="replace"))
+    lines = [line for line in lines if line.confidence >= MIN_NUMBER_CONFIDENCE]
+    digits = "".join(c for line in lines for c in line.text if c.isdigit())
+    return int(digits) if digits and len(digits) <= 4 else None

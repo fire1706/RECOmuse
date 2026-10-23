@@ -5,7 +5,7 @@ ni leur note de confiance. Le projet .omr (archive ZIP) les contient : pour chaq
 un fichier « sheet#N/sheet#N.xml » organisé ainsi :
 
     page → system → stack (une colonne de mesures : abscisses gauche et droite, en pixels)
-                  → part → measure (même identifiant que sa stack) : identifiants de ses
+                  → part → measure (dans l'ordre des stacks) : identifiants de ses
                            accords (head-chords), silences (rest-chords), clés, armures...
                   → sig/inters : tous les symboles, chacun avec sa boîte (bounds) en pixels
                                  de la feuille et sa note (grade, ctx-grade de 0 à 1)
@@ -52,6 +52,10 @@ class OmrMeasure:
     left: float
     right: float
     chords: list[OmrChord] = field(default_factory=list)
+    # Hauteur des portées de la partie (haut de la 1re ligne, bas de la dernière), en pixels :
+    # donne une boîte même à une mesure sans accord (pause multiple mal lue).
+    staff_top: float | None = None
+    staff_bottom: float | None = None
     attributes: list[OmrSymbol] = field(default_factory=list)   # clés, armures, chiffrages
     multirest_count: int | None = None
 
@@ -115,25 +119,40 @@ def read_sheet(omr_path: Path, sheet: int) -> OmrSheet | None:
                   if e.tag == "measure-count" and e.get("value", "").isdigit()
                   for s in [symbols.get(e.get("id"))] if s is not None]
 
-        stacks = {s.get("id"): (float(s.get("left")), float(s.get("right")))
-                  for s in system.findall("stack")}
+        # Colonnes de mesures du système, de gauche à droite. Les mesures d'une partie sont
+        # dans le même ordre (leurs identifiants ne sont PAS ceux des colonnes).
+        stacks = [(float(s.get("left")), float(s.get("right"))) for s in system.findall("stack")]
+        # Tous les accords et silences du système. La liste « head-chords » d'une mesure
+        # est incomplète (les accords ligaturés n'y sont pas) : on prend donc les accords
+        # de la portée de la partie dont l'abscisse tombe dans la colonne de la mesure.
+        all_chords = [OmrChord(symbol, [symbols[h] for h in contained.get(symbol.id, [])
+                                        if h in symbols and symbols[h].kind == "head"])
+                      for symbol in symbols.values() if symbol.kind in ("head-chord", "rest-chord")]
         parts = []
         for part in system.findall("part"):
+            staff_ids = {int(s.get("id")) for s in part.findall("staff") if s.get("id")}
+            line_ys = [float(point.get("y")) for staff in part.findall("staff")
+                       for point in staff.iter("point") if point.get("y")]
             measures = []
-            for element in part.findall("measure"):
-                left, right = stacks.get(element.get("id"), (0.0, 0.0))
-                measure = OmrMeasure(left=left, right=right)
-                chord_ids = _ids(element.find("head-chords")) + _ids(element.find("rest-chords"))
-                for chord_id in chord_ids:
-                    chord = symbols.get(chord_id)
-                    if chord is None:
-                        continue
-                    heads = [symbols[h] for h in contained.get(chord_id, [])
-                             if h in symbols and symbols[h].kind == "head"]
-                    measure.chords.append(OmrChord(chord, heads))
+            for index, element in enumerate(part.findall("measure")):
+                left, right = stacks[index] if index < len(stacks) else (0.0, 0.0)
+                measure = OmrMeasure(left=left, right=right,
+                                     staff_top=min(line_ys) if line_ys else None,
+                                     staff_bottom=max(line_ys) if line_ys else None)
+                listed = set(_ids(element.find("head-chords")) + _ids(element.find("rest-chords")))
+                for chord in all_chords:
+                    center = chord.symbol.bounds[0] + chord.symbol.bounds[2] / 2
+                    in_part = chord.symbol.staff in staff_ids if staff_ids else True
+                    if chord.symbol.id in listed or (in_part and left <= center < right):
+                        measure.chords.append(chord)
                 for tag in ("clefs", "keys", "times"):
                     measure.attributes += [symbols[i] for i in _ids(element.find(tag))
                                            if i in symbols]
+                # Barre de pause multiple de la colonne (elle n'est pas listée par la mesure).
+                measure.attributes += [
+                    s for s in symbols.values()
+                    if s.kind == "multiple-rest" and (s.staff in staff_ids if staff_ids else True)
+                    and left <= s.bounds[0] + s.bounds[2] / 2 < right]
                 for symbol, value in counts:
                     if left <= symbol.bounds[0] <= right:
                         measure.multirest_count = value
