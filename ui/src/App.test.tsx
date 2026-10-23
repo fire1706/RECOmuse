@@ -1,9 +1,9 @@
 // Tests de l'écran principal, avec un faux pont Python (aucune fenêtre pywebview).
 
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import App from './App'
+import App, { groupByPiece } from './App'
 import i18n from './i18n'
 import { fakeApi, fakeInfo, questionsState, restQuestion } from './testFakes'
 
@@ -83,7 +83,40 @@ describe('App', () => {
       }),
     )
     expect(await screen.findByText(/Est-ce une pause de 8 mesures/)).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Marche — Flûte (40 mesures)' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Flûte (40 mesures)' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Marche' })).toBeInTheDocument()
+  })
+
+  it('annonce les parties trouvées dans un PDF groupé', async () => {
+    const part = (id: number, instrument: string) => ({
+      score_id: id, title: "Throwin' Down", instrument, source_name: 'parts.pdf', pages: [id], measure_count: 109,
+    })
+    const api = fakeApi({
+      choose_file: async () => 'C:/partitions/parts.pdf',
+      open_file: async () => ({ scores: [part(1, 'Alto Sax 1'), part(2, 'Trumpet 1'), part(3, 'Trombone 1')] }),
+    })
+    render(<App connect={async () => api} />)
+    await screen.findByText(/Moteur prêt/)
+    fireEvent.click(screen.getByRole('button', { name: 'Ouvrir une partition…' }))
+    expect(await screen.findByText(/3 parties trouvées dans ce fichier/)).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: "Throwin' Down" })).getAllByRole('option')).toHaveLength(3)
+  })
+})
+
+describe('groupByPiece', () => {
+  it('regroupe les parties de même titre, accents et ponctuation mis à part', () => {
+    const score = (id: number, title: string | null) => ({
+      score_id: id, title, instrument: null, source_name: null, pages: [], measure_count: 0,
+    })
+    const groups = groupByPiece(
+      [score(1, 'Marche d’Acoz'), score(2, 'Zorba'), score(3, "MARCHE D'ACOZ"), score(4, null)],
+      'Sans titre',
+    )
+    expect(groups.map(([title, parts]) => [title, parts.map((p) => p.score_id)])).toEqual([
+      ['Marche d’Acoz', [1, 3]],
+      ['Zorba', [2]],
+      ['Sans titre', [4]],
+    ])
   })
 
   it("affiche l'erreur d'une lecture impossible", async () => {

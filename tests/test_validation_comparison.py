@@ -151,3 +151,11 @@ def test_part_refs_and_groups():
     assert [(r.label, r.source) for r in refs] == [("Piano", "vector"), ("Flute", "audiveris")]
     groups = group_by_title([piano, flute, other])
     assert {title: len(models) for title, models in groups.items()} == {"blues": 2, "marche": 1}
+
+
+def test_issues_name_their_part_by_rank():
+    """Chaque problème dit à quelle partie de la liste il se rapporte (details["ref_index"])."""
+    report = compare_parts(refs_of(STRUCTURE, STRUCTURE.replace("M8", "r"),
+                                   STRUCTURE.replace("t3/4:n", "t2/4:n"), STRUCTURE))
+    assert {(i.code, i.details["ref_index"]) for i in report.issues} == {
+        ("part_measures_missing", 1), ("part_time_signature_differs", 2)}

@@ -46,7 +46,7 @@ export const noteQuestion: Question = {
 }
 
 export function questionsState(questions: Question[], extra: Partial<QuestionsState> = {}): QuestionsState {
-  return { score_id: 1, questions, unasked: 0, answered: 0, can_undo: false, ...extra }
+  return { score_id: 1, questions, unasked: 0, compared_parts: 0, answered: 0, can_undo: false, ...extra }
 }
 
 /** Faux pont : chaque méthode peut être remplacée par le test. */

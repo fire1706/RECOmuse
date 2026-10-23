@@ -4,6 +4,9 @@ Chaque problème du validateur qui propose une correction devient une question :
 extrait de la partition (la zone de la page, le symbole entouré) et des choix cliquables.
 Les problèmes sans proposition (une mesure dont le compte est faux, sans explication)
 ne deviennent pas des questions : ils seront à revoir dans la vue côte à côte (tâche 9).
+Les problèmes trouvés en comparant les parties d'un même morceau (validation/comparison.py)
+en sont aussi : « les autres parties ont 7 mesures de plus ici : cette pause dure-t-elle
+8 mesures ? ».
 
 Les textes ne sont PAS écrits ici : une question porte un code (« multirest_missed ») et
 des valeurs (« count » : 8), un choix porte une étiquette (« rest_measures ») ; l'interface
@@ -30,8 +33,11 @@ CODE_ORDER = [
     "clef_octave_suspicious",
     "time_signature_missing",
     "time_signature_missed",
+    "part_time_signature_differs",
     "multirest_missed",
     "measure_number_mismatch",
+    "part_measures_missing",
+    "part_measures_extra",
     "multirest_count_unknown",
     "note_out_of_range",
     "note_position_mismatch",
@@ -195,8 +201,10 @@ def _out_of_range(model: ScoreModel, issues: list[Issue]) -> Question:
 
 
 def _time_signature(model: ScoreModel, issue: Issue) -> Question | None:
-    """Chiffrage manqué (plusieurs mesures de suite ont la même durée fausse) ou absent."""
-    proposed = issue.details.get("proposed") or issue.action.get("insert_time")
+    """Chiffrage manqué (plusieurs mesures de suite ont la même durée fausse), absent, ou
+    différent de celui des autres parties du morceau au même endroit."""
+    proposed = (issue.details.get("proposed") or issue.details.get("others")
+                or issue.action.get("insert_time"))
     if not proposed:
         return None
     part, first = _part_and_measure(model, issue)
@@ -211,12 +219,17 @@ def _time_signature(model: ScoreModel, issue: Issue) -> Question | None:
         accept = Choice("accept", "time_is", {"time": proposed},
                         additions=[NewSymbol(target.id, "time", value)])
     choices = [accept]
+    params = {"time": proposed, "measures": len(issue.measure_numbers)}
     if issue.code == "time_signature_missed":
         read = _time_text(model, part, first)
         choices.append(Choice("keep", "time_unchanged", {"time": read}))
-    return _question(model, issue, [], params={"time": proposed,
-                                               "measures": len(issue.measure_numbers)},
-                     choices=choices)
+    elif issue.code == "part_time_signature_differs":
+        read = issue.details.get("read")
+        choices.append(Choice("keep", "time_as_read", {"time": read}) if read
+                       else Choice("keep", "time_unchanged"))
+        params = {"time": proposed, "agreeing_parts": issue.details.get("agreeing_parts"),
+                  "parts": issue.details.get("parts")}
+    return _question(model, issue, [], params=params, choices=choices)
 
 
 def _multirest(model: ScoreModel, issue: Issue) -> Question | None:
@@ -231,10 +244,10 @@ def _multirest(model: ScoreModel, issue: Issue) -> Question | None:
         count = issue.fixes[0].value["count"]
     if issue.code == "multirest_count_unknown":
         count = None
-    elif issue.code == "measure_number_mismatch" and not issue.action:
-        return None            # saut de numérotation sans pause pour l'expliquer
+    elif issue.code in NEEDS_PROPOSAL and not (issue.action or issue.fixes):
+        return None            # écart sans pause pour l'expliquer
     choices = []
-    if count and count > 1:
+    if count and (count > 1 or multirest is not None):
         fixes, additions = _multirest_changes(measure.id, multirest.id if multirest else None,
                                               count)
         choices.append(Choice("accept", "rest_measures", {"count": count}, fixes=fixes,
@@ -243,16 +256,25 @@ def _multirest(model: ScoreModel, issue: Issue) -> Question | None:
                           multirest_id=multirest.id if multirest else None))
     if multirest is None:
         choices.append(Choice("keep", "rest_one_measure"))
+    elif issue.code in NEEDS_PROPOSAL:
+        # Les autres parties peuvent se tromper aussi : garder le nombre lu.
+        choices.append(Choice("keep", "rest_as_read", {"count": measure.length}))
     params = {"count": count}
     if issue.code == "measure_number_mismatch":
         params |= {"printed_before": issue.details.get("printed_before"),
                    "printed_after": issue.details.get("printed_after")}
+    elif issue.code in ("part_measures_missing", "part_measures_extra"):
+        params |= {"difference": issue.details.get("missing") or issue.details.get("extra"),
+                   "read": measure.length}
     symbols = [multirest] if multirest else list(measure.events)
     question = _question(model, issue, symbols, params=params, choices=choices,
                          key=f"multirest:{issue.part_id}:{measure.id}", measure=measure)
     question.measure_numbers = [measure.number]
     return question
 
+
+# Doutes qui ne deviennent une question que s'ils proposent une pause à corriger.
+NEEDS_PROPOSAL = ("measure_number_mismatch", "part_measures_missing", "part_measures_extra")
 
 BUILDERS = {
     "clef_octave_suspicious": _clef_octave,
@@ -262,6 +284,9 @@ BUILDERS = {
     "multirest_missed": _multirest,
     "multirest_count_unknown": _multirest,
     "measure_number_mismatch": _multirest,
+    "part_measures_missing": _multirest,
+    "part_measures_extra": _multirest,
+    "part_time_signature_differs": _time_signature,
 }
 
 

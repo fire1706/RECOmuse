@@ -5,7 +5,8 @@ Fichiers du module :
 - questions.py : des problèmes du validateur aux questions (tri, regroupement des doutes
                  de même cause, choix proposés et corrections qu'ils impliquent) ;
 - images.py    : image d'une question (zone de la page, symboles douteux entourés) ;
-- session.py   : déroulement (questions restantes, réponses, annulation de la dernière).
+- session.py   : déroulement (questions restantes, réponses, annulation de la dernière) ;
+                 la partition y est aussi comparée aux autres parties du même morceau.
 
 Les réponses passent par le service de corrections (learning/corrections.py) et sont
 gardées dans la table question_answers. Les règles apprises (tâche 12) seront consultées

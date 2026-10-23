@@ -127,6 +127,7 @@ export default function QuestionPanel({ api, scoreId, onAnswered }: QuestionPane
       <p className="question-progress">
         {t('questions.remaining', { count: state.questions.length })}
         {state.answered > 0 && ` · ${t('questions.answered', { count: state.answered })}`}
+        {state.compared_parts > 0 && ` · ${t('questions.compared', { count: state.compared_parts })}`}
       </p>
       <p className="question-where">
         {t('questions.where', {

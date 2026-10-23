@@ -20,7 +20,8 @@ from recomuse.model.score import Measure, Part, ScoreModel, Symbol
 from recomuse.recognition.header import HeaderInfo
 
 
-def _normalized(text: str | None) -> str | None:
+def normalized(text: str | None) -> str | None:
+    """Texte simplifié pour comparer deux noms : minuscules, sans accents ni ponctuation."""
     if not text:
         return None
     plain = unicodedata.normalize("NFKD", text)
@@ -37,15 +38,15 @@ def instrument_key(name: str | None, title: str | None = None) -> tuple[str, ...
     """Clé d'un nom d'instrument pour savoir si deux en-têtes désignent la même partie :
     sans les mots du titre (en-tête courant « Guitar Throwin' Down »), sans mots génériques,
     au singulier. Les numéros restent : « Trumpet 1 » ≠ « Trumpet 2 »."""
-    words = (_normalized(name) or "").split()
-    title_words = set((_normalized(title) or "").split())
+    words = (normalized(name) or "").split()
+    title_words = set((normalized(title) or "").split())
     key = tuple(w[:-1] if len(w) > 3 and w.endswith("s") else w
                 for w in words if w not in title_words and w not in GENERIC_WORDS)
     return key or None
 
 
 def _same_title(a: str | None, b: str | None) -> bool:
-    a, b = _normalized(a), _normalized(b)
+    a, b = normalized(a), normalized(b)
     return bool(a and b and (a == b or a in b or b in a))
 
 

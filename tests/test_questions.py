@@ -139,3 +139,53 @@ def test_to_dict_is_plain_data():
     assert data["choices"][0] == {"id": "accept", "label": "time_is",
                                   "params": {"time": "3/4"}, "input": None}
     assert "fixes" not in data["choices"][0]
+
+
+def test_comparison_questions():
+    """Écarts avec les autres parties du morceau : pause trop courte, trop longue,
+    chiffrage différent."""
+    model = model_of([measure("m1", quarters("m1", 4), [treble(), four_four()]),
+                      measure("m2", [rest("m2.r", "4", full=True)]),
+                      measure("m3", [], [attribute("mr", "multirest", count=10)]),
+                      measure("m4", quarters("m4", 4), [attribute("t2", "time", beats=2,
+                                                                  beat_type=4)]),
+                      measure("m5", quarters("m5", 4))])
+    missing = Issue("part_measures_missing", "P1", [2], "error", 0.9, symbol_ids=["m2.r"],
+                    details={"missing": 7, "usual_length": 40},
+                    action={"set_multirest": 8, "measure_id": "m2"})
+    extra = Issue("part_measures_extra", "P1", [3], "error", 0.9, symbol_ids=["mr"],
+                  details={"extra": 2, "usual_length": 40}, fixes=[Fix("mr", {"count": 8})])
+    unexplained = Issue("part_measures_missing", "P1", [13, 14], "error", 0.9,
+                        details={"missing": 1, "usual_length": 40})
+    differs = Issue("part_time_signature_differs", "P1", [13], "error", 0.8, symbol_ids=["t2"],
+                    details={"read": "2/4", "others": "3/4", "agreeing_parts": 5, "parts": 6},
+                    fixes=[Fix("t2", {"beats": 3, "beat_type": 4})])
+    inserted = Issue("part_time_signature_differs", "P1", [14], "error", 0.8,
+                     details={"read": None, "others": "3/4", "agreeing_parts": 5, "parts": 6},
+                     action={"insert_time": "3/4", "before_measure": 14})
+    questions, unasked = build_questions(
+        model, ValidationReport([missing, extra, unexplained, differs, inserted]))
+    assert unasked == 1
+    by_key = {q.key: q for q in questions}
+
+    short = by_key["multirest:P1:m2"]
+    assert short.code == "part_measures_missing"
+    assert short.params == {"count": 8, "difference": 7, "read": 1}
+    assert [c.label for c in short.choices] == ["rest_measures", "rest_other_count",
+                                                "rest_one_measure"]
+
+    long = by_key["multirest:P1:m3"]
+    assert long.params["difference"] == 2 and long.params["read"] == 10
+    accept, _, keep = long.choices
+    assert [(f.symbol_id, f.value) for f in accept.changes()[0]] == [("mr", {"count": 8})]
+    assert (keep.label, keep.params, keep.changes()) == ("rest_as_read", {"count": 10}, ([], []))
+
+    changed = by_key["part_time_signature_differs:P1:t2"]
+    assert changed.params == {"time": "3/4", "agreeing_parts": 5, "parts": 6}
+    assert [(c.label, c.params) for c in changed.choices] == [
+        ("time_is", {"time": "3/4"}), ("time_as_read", {"time": "2/4"})]
+    added = next(q for k, q in by_key.items() if k.startswith("part_time_signature_differs")
+                 and k != "part_time_signature_differs:P1:t2")
+    assert added.choices[0].changes() == ([], [NewSymbol("m5", "time",
+                                                         {"beats": 3, "beat_type": 4})])
+    assert added.choices[1].label == "time_unchanged"

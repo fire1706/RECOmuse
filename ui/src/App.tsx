@@ -27,10 +27,24 @@ interface AppProps {
   connect?: () => Promise<PythonApi | null>
 }
 
-/** Nom d'une partition dans la liste : titre, instrument, nombre de mesures. */
+/** Nom d'une partition dans la liste : son instrument (le morceau est le titre du groupe). */
 function scoreLabel(score: ScoreSummary, unknown: string): string {
-  const title = score.title ?? score.source_name ?? unknown
-  return score.instrument ? `${title} — ${score.instrument}` : title
+  return score.instrument ?? score.source_name ?? unknown
+}
+
+/**
+ * Regroupe les partitions par morceau (même titre, comme le moteur pour les comparer),
+ * dans l'ordre où les morceaux apparaissent dans la liste.
+ */
+export function groupByPiece(scores: ScoreSummary[], untitled: string): [string, ScoreSummary[]][] {
+  const groups = new Map<string, [string, ScoreSummary[]]>()
+  for (const score of scores) {
+    const title = score.title ?? untitled
+    const key = title.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, ' ').trim()
+    if (!groups.has(key)) groups.set(key, [title, []])
+    groups.get(key)![1].push(score)
+  }
+  return [...groups.values()]
 }
 
 export default function App({ connect = waitForBridge }: AppProps) {
@@ -40,6 +54,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
   const [scoreId, setScoreId] = useState<number | null>(null)
   const [reading, setReading] = useState<string | null>(null) // étape de la lecture en cours
   const [openError, setOpenError] = useState<string | null>(null)
+  const [openedParts, setOpenedParts] = useState<number | null>(null)
   const poll = useRef<number | null>(null)
 
   useEffect(() => {
@@ -79,6 +94,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
     const path = await api.choose_file(t('open.filter'))
     if (!path) return
     setOpenError(null)
+    setOpenedParts(null)
     setReading('import')
     poll.current = window.setInterval(async () => {
       const { stage } = await api.get_progress()
@@ -91,6 +107,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
       } else {
         setScores([...result.scores, ...scores])
         setScoreId(result.scores[0]?.score_id ?? null)
+        setOpenedParts(result.scores.length)
       }
     } catch {
       setOpenError('unexpected')
@@ -120,13 +137,17 @@ export default function App({ connect = waitForBridge }: AppProps) {
               <select value={scoreId ?? ''} disabled={reading !== null}
                 onChange={(e) => setScoreId(e.target.value ? Number(e.target.value) : null)}>
                 <option value="">{t('scores.choose')}</option>
-                {scores.map((score) => (
-                  <option key={score.score_id} value={score.score_id}>
-                    {t('scores.item', {
-                      name: scoreLabel(score, t('scores.untitled')),
-                      count: score.measure_count,
-                    })}
-                  </option>
+                {groupByPiece(scores, t('scores.unknownPiece')).map(([title, parts]) => (
+                  <optgroup key={title} label={title}>
+                    {parts.map((score) => (
+                      <option key={score.score_id} value={score.score_id}>
+                        {t('scores.item', {
+                          name: scoreLabel(score, t('scores.untitled')),
+                          count: score.measure_count,
+                        })}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </label>
@@ -155,6 +176,9 @@ export default function App({ connect = waitForBridge }: AppProps) {
             <p className="reading" role="progressbar" aria-busy="true">
               {t(`open.stage.${reading}`, { defaultValue: t('open.stage.recognition') })}
             </p>
+          )}
+          {openedParts !== null && openedParts > 1 && (
+            <p className="question-note">{t('open.parts', { count: openedParts })}</p>
           )}
           {openError && (
             <p className="error">{t(`errors.${openError}`, { defaultValue: t('errors.unexpected') })}</p>

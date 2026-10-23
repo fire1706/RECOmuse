@@ -30,14 +30,17 @@
       "recognition": "Lecture de la partition… Cela peut prendre une ou deux minutes par page scannée.",
       "model": "Mise en ordre de la partition…",
       "done": "Lecture terminée."
-    }
+    },
+    "parts_one": "{{count}} partie lue.",
+    "parts_other": "{{count}} parties trouvées dans ce fichier : choisissez-en une dans la liste."
   },
   "scores": {
     "label": "Partition",
     "choose": "Choisir…",
     "item_one": "{{name}} ({{count}} mesure)",
     "item_other": "{{name}} ({{count}} mesures)",
-    "untitled": "Sans titre"
+    "untitled": "Sans titre",
+    "unknownPiece": "Morceau sans titre"
   },
   "questions": {
     "loading": "Recherche des doutes…",
@@ -64,7 +67,10 @@
       "multirest_missed": "Ce silence a été lu comme une seule mesure. Est-ce une pause de {{count}} mesures ?",
       "multirest_missed_no_count": "Ce silence a été lu comme une seule mesure. Est-ce une pause de plusieurs mesures ?",
       "multirest_count_unknown": "Le nombre de mesures de cette pause n'a pas pu être lu. Combien de mesures dure-t-elle ?",
-      "measure_number_mismatch": "D'après les numéros de mesure imprimés ({{printed_before}}, puis {{printed_after}}), il manque des mesures. Ce silence est-il une pause de {{count}} mesures ?"
+      "measure_number_mismatch": "D'après les numéros de mesure imprimés ({{printed_before}}, puis {{printed_after}}), il manque des mesures. Ce silence est-il une pause de {{count}} mesures ?",
+      "part_measures_missing": "Les autres parties du morceau ont {{difference}} mesure(s) de plus ici. Ce silence est-il une pause de {{count}} mesures ?",
+      "part_measures_extra": "Cette partie a {{difference}} mesure(s) de plus que les autres parties du morceau. Cette pause dure-t-elle {{count}} mesures ?",
+      "part_time_signature_differs": "Ici, {{agreeing_parts}} parties du morceau sur {{parts}} sont à {{time}}. Et celle-ci ?"
     },
     "choices": {
       "clef_plain": "Une clé normale, sans 8",
@@ -75,10 +81,16 @@
       "notes_correct": "Non, elles sont justes",
       "time_is": "Oui, {{time}}",
       "time_unchanged": "Non, le chiffrage ne change pas",
-      "rest_measures": "Oui, {{count}} mesures",
       "rest_other_count": "Nombre de mesures :",
-      "rest_one_measure": "Non, une seule mesure"
-    }
+      "rest_one_measure": "Non, une seule mesure",
+      "rest_measures_one": "Oui, une seule mesure",
+      "rest_measures_other": "Oui, {{count}} mesures",
+      "rest_as_read_one": "Non, une seule mesure, comme lu",
+      "rest_as_read_other": "Non, {{count}} mesures, comme lu",
+      "time_as_read": "Non, {{time}}, comme lu"
+    },
+    "compared_one": "Comparée à {{count}} autre partie du morceau.",
+    "compared_other": "Comparée aux {{count}} autres parties du morceau."
   },
   "errors": {
     "unexpected": "Une erreur inattendue s'est produite. Réessayez ; si elle revient, signalez-la.",

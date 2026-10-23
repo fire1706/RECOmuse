@@ -56,6 +56,8 @@ export interface QuestionsState {
   questions: Question[]
   /** Points sans question (à revoir dans la vue côte à côte). */
   unasked: number
+  /** Nombre d'autres parties du morceau auxquelles la partition a été comparée. */
+  compared_parts: number
   answered: number
   can_undo: boolean
 }

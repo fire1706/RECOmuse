@@ -12,7 +12,16 @@ from recomuse.model.store import load_model, save_model
 from recomuse.questions.images import question_image
 from recomuse.questions.session import QuestionError, QuestionSession
 
-from validation_helpers import four_four, measure, model_of, note, page_image, treble
+from validation_helpers import (
+    attribute,
+    four_four,
+    measure,
+    model_of,
+    note,
+    page_image,
+    rest,
+    treble,
+)
 
 KEY = "time_signature_missed:P1:m2,m3,m4,m5"
 
@@ -109,3 +118,39 @@ def test_question_image_crops_and_circles():
     assert small.shape == (100, 1000)
     with pytest.raises(ValueError):
         question_image(page, (700, 700, 10, 10), [])
+
+
+def test_parts_of_a_piece_are_compared(conn, tmp_path):
+    """Trois parties d'un même morceau : celle dont la pause de 4 mesures a été lue comme
+    une seule mesure reçoit la question « est-ce une pause de 4 mesures ? »."""
+    def part(name: str, rest_count: int):
+        rest_measure = (measure(f"{name}.m2", [], [attribute(f"{name}.mr", "multirest",
+                                                             count=rest_count)])
+                        if rest_count > 1 else
+                        measure(f"{name}.m2", [rest(f"{name}.r", "4", full=True)]))
+        return model_of([measure(f"{name}.m1", quarters(f"{name}.m1", 4),
+                                 [treble(f"{name}.c"), four_four(f"{name}.t")]),
+                         rest_measure,
+                         measure(f"{name}.m3", quarters(f"{name}.m3", 4)),
+                         measure(f"{name}.m4", quarters(f"{name}.m4", 4))], name=name)
+
+    ids = {}
+    for name, count in [("flute", 4), ("clarinette", 1), ("trompette", 4)]:
+        model = part(name, count)
+        model.title = "Marche d'Acoz"
+        with conn:
+            cursor = conn.execute("INSERT INTO scores (title, source_path) VALUES (?, ?)",
+                                  (model.title, f"{name}.pdf"))
+        ids[name] = cursor.lastrowid
+        save_model(conn, cursor.lastrowid, model)
+
+    session = QuestionSession(conn, work_dir=tmp_path / "travail")
+    state = session.state(ids["clarinette"])
+    assert state["compared_parts"] == 2
+    [question] = state["questions"]
+    assert question["code"] == "part_measures_missing"
+    assert question["key"] == "multirest:P1:clarinette.m2"
+    assert question["params"]["count"] == 4
+    session.answer(ids["clarinette"], question["key"], "accept")
+    assert sum(m.length for m in load_model(conn, ids["clarinette"]).parts[0].measures) == 7
+    assert session.state(ids["flute"])["questions"] == []

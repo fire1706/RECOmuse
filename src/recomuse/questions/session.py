@@ -2,25 +2,30 @@
 
 À chaque demande, la partition est revalidée et les questions recalculées : une réponse
 peut en faire disparaître d'autres (corriger une pause multiple règle aussi le saut des
-numéros de mesure qui la suivent). Les questions déjà répondues ne sont plus posées,
-même si la réponse était « c'est juste » (table question_answers).
+numéros de mesure qui la suivent). Si d'autres parties du même morceau ont été lues (même
+titre), la partition leur est aussi comparée (validation/comparison.py).
+Les questions déjà répondues ne sont plus posées, même si la réponse était « c'est
+juste » (table question_answers).
 
 Toutes les corrections passent par le service de corrections (learning/corrections.py).
 Les règles apprises (tâche 12) seront consultées ici avant de poser une question.
 """
 
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
 from typing import Any
 
-from recomuse import paths
+from recomuse import library, paths
 from recomuse.learning.corrections import CorrectionService
 from recomuse.model.score import ScoreModel
 from recomuse.model.store import load_model
 from recomuse.questions.images import question_image
 from recomuse.questions.questions import Question, build_questions
+from recomuse.validation.comparison import compare_parts, part_refs
 from recomuse.validation.geometry import PageGeometries
+from recomuse.validation.issues import Issue, ValidationReport
 from recomuse.validation.validator import tesseract_number_reader, validate
 
 
@@ -41,6 +46,7 @@ class QuestionSession:
         self._geometries: tuple[int, PageGeometries] | None = None
         self._read_number = None
         self._current: dict[int, dict[str, Question]] = {}
+        self._compared: dict[int, int] = {}     # nombre d'autres parties comparées
 
     # --- Demandes de l'interface ------------------------------------------------------------
 
@@ -55,6 +61,7 @@ class QuestionSession:
             data["image"] = self._image(model, question, geometries)
             listed.append(data)
         return {"score_id": score_id, "questions": listed, "unasked": unasked,
+                "compared_parts": self._compared.get(score_id, 0),
                 "answered": self._answer_count(score_id),
                 "can_undo": self._last_answer(score_id) is not None}
 
@@ -111,11 +118,32 @@ class QuestionSession:
     def _questions(self, score_id: int, model: ScoreModel) -> tuple[list[Question], int]:
         report = validate(model, read_number=self._number_reader(),
                           geometries=self._page_images(score_id))
+        report = ValidationReport(report.issues + self._comparison(score_id, model))
         questions, unasked = build_questions(model, report)
         answered = self._answered_keys(score_id)
         questions = [q for q in questions if q.key not in answered]
         self._current[score_id] = {q.key: q for q in questions}
         return questions, unasked
+
+    def _comparison(self, score_id: int, model: ScoreModel) -> list[Issue]:
+        """Problèmes de cette partition trouvés en la comparant aux autres parties du
+        morceau ; leur partie est ramenée à celle du modèle (« P1 »)."""
+        refs, owners = [], []
+        for other_id in library.piece_of(self._conn, score_id):
+            other = model if other_id == score_id else load_model(self._conn, other_id)
+            for ref in part_refs([other] if other else []):
+                refs.append(ref)
+                owners.append(other_id)
+        self._compared[score_id] = len(set(owners) - {score_id})
+        if len(set(owners)) < 2:
+            return []
+        issues = []
+        for issue in compare_parts(refs).issues:
+            index = issue.details.get("ref_index")
+            if index is not None and owners[index] == score_id:
+                issue.part_id = refs[index].part.id
+                issues.append(issue)
+        return issues
 
     def _page_images(self, score_id: int) -> PageGeometries:
         if self._geometries is None or self._geometries[0] != score_id:
@@ -123,10 +151,13 @@ class QuestionSession:
         return self._geometries[1]
 
     def _number_reader(self):
-        """Lecture des nombres des pauses multiples par Tesseract (None s'il manque)."""
+        """Lecture des nombres (pauses multiples, numéros de mesure) par Tesseract, None s'il
+        manque. Chaque morceau d'image n'est lu qu'une fois : la partition est revalidée
+        après chaque réponse, et Tesseract met un cinquième de seconde par nombre."""
         if self._read_number is None:
             folder = (self._work_dir or paths.imports_dir()) / "validation"
-            self._read_number = tesseract_number_reader(folder) or False
+            reader = tesseract_number_reader(folder)
+            self._read_number = _remembered(reader) if reader else False
         return self._read_number or None
 
     def _image(self, model: ScoreModel, question: Question,
@@ -158,3 +189,15 @@ class QuestionSession:
             "SELECT id, correction_ids FROM question_answers WHERE score_id = ? AND undone = 0"
             " ORDER BY id DESC LIMIT 1", (score_id,)).fetchone()
         return (row[0], json.loads(row[1])) if row else None
+
+
+def _remembered(reader):
+    """Le même lecteur de nombres, qui se souvient de ce qu'il a déjà lu."""
+    known: dict[tuple, int | None] = {}
+
+    def read(pixels):
+        key = (pixels.shape, hashlib.sha1(pixels.tobytes()).hexdigest())
+        if key not in known:
+            known[key] = reader(pixels)
+        return known[key]
+    return read

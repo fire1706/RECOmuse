@@ -24,7 +24,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 
 from recomuse.model.score import Measure, Part, ScoreModel
-from recomuse.model.split import _normalized
+from recomuse.model.split import normalized
 from recomuse.validation.issues import Fix, Issue, ValidationReport
 
 # Coûts de l'alignement.
@@ -154,7 +154,7 @@ def group_by_title(models: list[ScoreModel]) -> dict[str, list[ScoreModel]]:
     """Regroupe les modèles d'un même morceau (même titre)."""
     groups: dict[str, list[ScoreModel]] = {}
     for model in models:
-        groups.setdefault(_normalized(model.title) or "?", []).append(model)
+        groups.setdefault(normalized(model.title) or "?", []).append(model)
     return groups
 
 
@@ -169,7 +169,8 @@ def _shared_marks_only(sequences: list[list[Unit]]) -> list[list[Unit]]:
 
 
 def compare_parts(refs: list[PartRef]) -> ValidationReport:
-    """Compare les parties d'un même morceau et signale celles qui s'écartent."""
+    """Compare les parties d'un même morceau et signale celles qui s'écartent.
+    Chaque problème porte dans details["ref_index"] le rang de sa partie dans `refs`."""
     if len(refs) < 2:
         return ValidationReport([])
     sequences = _shared_marks_only([units(ref.part) for ref in refs])
@@ -182,7 +183,9 @@ def compare_parts(refs: list[PartRef]) -> ValidationReport:
     issues: list[Issue] = []
     agreeing = sum(1 for s in sequences if len(s) == usual)
     for k, pairs in alignments.items():
-        issues += _gaps(refs[k], sequences[k], pairs, usual, agreeing, len(refs))
+        for issue in _gaps(refs[k], sequences[k], pairs, usual, agreeing, len(refs)):
+            issue.details["ref_index"] = k
+            issues.append(issue)
     issues += _time_disagreements(refs, sequences, reference, alignments)
     return ValidationReport(issues)
 
@@ -305,7 +308,8 @@ def _time_disagreements(refs: list[PartRef], sequences: list[list[Unit]], refere
                           measure_numbers=[unit.measure.number], severity="error",
                           confidence=round(count / len(position), 2),
                           details={"read": unit.time, "others": value,
-                                   "agreeing_parts": count, "parts": len(position)})
+                                   "agreeing_parts": count, "parts": len(position),
+                                   "ref_index": k})
             if value is not None and time is not None:
                 beats, beat_type = value.split("/")
                 issue.fixes.append(Fix(time.id, {"beats": int(beats), "beat_type": int(beat_type)}))

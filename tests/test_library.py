@@ -62,3 +62,26 @@ def test_only_one_reading_at_a_time(conn, tmp_path):
         assert api.open_file(str(tmp_path / "x.pdf")) == {"error": "busy"}
     finally:
         api._busy.release()
+
+
+def test_piece_of_groups_parts_by_title(conn):
+    from recomuse.model.score import ScoreModel
+    from recomuse.model.store import save_model
+
+    def add(title, source):
+        with conn:
+            cursor = conn.execute("INSERT INTO scores (title, source_path) VALUES (?, ?)",
+                                  (title, source))
+        save_model(conn, cursor.lastrowid, ScoreModel(title=title))
+        return cursor.lastrowid
+
+    flute = add("Marche d'Acoz", "flute.pdf")
+    trumpet = add("MARCHE D’ACOZ", "trompette.pdf")       # autre fichier, même morceau
+    other = add("Zorba", "zorba.pdf")
+    untitled_a = add(None, "groupe.pdf")
+    untitled_b = add(None, "groupe.pdf")
+    add(None, "autre.pdf")
+    assert library.piece_of(conn, flute) == [flute, trumpet]
+    assert library.piece_of(conn, other) == [other]
+    assert library.piece_of(conn, untitled_b) == [untitled_a, untitled_b]
+    assert library.piece_of(conn, 999) == []

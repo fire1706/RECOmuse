@@ -30,14 +30,17 @@
       "recognition": "Reading the score… This can take a minute or two per scanned page.",
       "model": "Putting the score in order…",
       "done": "Reading finished."
-    }
+    },
+    "parts_one": "{{count}} part read.",
+    "parts_other": "{{count}} parts found in this file: pick one from the list."
   },
   "scores": {
     "label": "Score",
     "choose": "Choose…",
     "item_one": "{{name}} ({{count}} bar)",
     "item_other": "{{name}} ({{count}} bars)",
-    "untitled": "Untitled"
+    "untitled": "Untitled",
+    "unknownPiece": "Untitled piece"
   },
   "questions": {
     "loading": "Looking for doubtful spots…",
@@ -64,7 +67,10 @@
       "multirest_missed": "This rest was read as a single bar. Is it a {{count}}-bar rest?",
       "multirest_missed_no_count": "This rest was read as a single bar. Is it a rest of several bars?",
       "multirest_count_unknown": "The number of bars of this rest could not be read. How many bars does it last?",
-      "measure_number_mismatch": "According to the printed bar numbers ({{printed_before}}, then {{printed_after}}), some bars are missing. Is this rest a {{count}}-bar rest?"
+      "measure_number_mismatch": "According to the printed bar numbers ({{printed_before}}, then {{printed_after}}), some bars are missing. Is this rest a {{count}}-bar rest?",
+      "part_measures_missing": "The other parts of the piece have {{difference}} more bar(s) here. Is this rest a {{count}}-bar rest?",
+      "part_measures_extra": "This part has {{difference}} more bar(s) than the other parts of the piece. Does this rest last {{count}} bars?",
+      "part_time_signature_differs": "Here, {{agreeing_parts}} of the {{parts}} parts of the piece are in {{time}}. What about this one?"
     },
     "choices": {
       "clef_plain": "A normal clef, without an 8",
@@ -75,10 +81,16 @@
       "notes_correct": "No, they are right",
       "time_is": "Yes, {{time}}",
       "time_unchanged": "No, the time signature does not change",
-      "rest_measures": "Yes, {{count}} bars",
       "rest_other_count": "Number of bars:",
-      "rest_one_measure": "No, a single bar"
-    }
+      "rest_one_measure": "No, a single bar",
+      "rest_measures_one": "Yes, a single bar",
+      "rest_measures_other": "Yes, {{count}} bars",
+      "rest_as_read_one": "No, a single bar, as read",
+      "rest_as_read_other": "No, {{count}} bars, as read",
+      "time_as_read": "No, {{time}}, as read"
+    },
+    "compared_one": "Compared with {{count}} other part of the piece.",
+    "compared_other": "Compared with the {{count}} other parts of the piece."
   },
   "errors": {
     "unexpected": "An unexpected error occurred. Try again; if it happens again, please report it.",

@@ -94,6 +94,24 @@ describe('QuestionPanel', () => {
     expect(await screen.findByText("Cette réponse n'a pas pu être enregistrée.")).toBeInTheDocument()
   })
 
+  it("pose les questions issues de la comparaison entre parties", async () => {
+    const question = {
+      ...restQuestion,
+      key: 'multirest:P1:m82',
+      code: 'part_measures_missing',
+      params: { count: 8, difference: 7, read: 1 },
+      choices: [
+        { id: 'accept', label: 'rest_measures', params: { count: 8 }, input: null },
+        { id: 'keep', label: 'rest_as_read', params: { count: 1 }, input: null },
+      ],
+    }
+    const api = fakeApi({ get_questions: async () => questionsState([question], { compared_parts: 16 }) })
+    render(<QuestionPanel api={api} scoreId={1} />)
+    expect(await screen.findByText(/Les autres parties du morceau ont 7 mesure\(s\) de plus ici/)).toBeInTheDocument()
+    expect(screen.getByText(/Comparée aux 16 autres parties du morceau/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Non, une seule mesure, comme lu' })).toBeInTheDocument()
+  })
+
   it('parle anglais', async () => {
     await act(() => i18n.changeLanguage('en'))
     const api = fakeApi({ get_questions: async () => questionsState([noteQuestion]) })
