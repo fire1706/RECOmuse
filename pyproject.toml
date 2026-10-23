@@ -12,6 +12,9 @@ requires-python = ">=3.12,<3.13"
 authors = [{ name = "Fanfare Royale d'Acoz" }]
 dependencies = [
     "pywebview>=5.3",
+    "pymupdf>=1.24",
+    "opencv-python-headless>=4.10",
+    "numpy>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -32,8 +35,14 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+# Les tests sur le corpus réel ne tournent que sur demande : pytest -m corpus
+addopts = "-ra -m 'not corpus'"
+markers = ["corpus: tests sur les vraies partitions du corpus local (lecture seule)"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint.isort]
+# Outils de test locaux (tests/synthetic.py), rangés après les imports du projet.
+known-local-folder = ["synthetic"]

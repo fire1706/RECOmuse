@@ -22,6 +22,9 @@ DATABASE_FILENAME = "recomuse.sqlite3"
 # Nom du sous-dossier qui contient les extraits d'images des symboles.
 SNIPPETS_DIRNAME = "snippets"
 
+# Nom du sous-dossier qui contient les pages préparées (images à 300 dpi) des imports.
+IMPORTS_DIRNAME = "imports"
+
 
 def data_dir() -> Path:
     """Renvoie le dossier des données locales et le crée s'il n'existe pas encore."""
@@ -49,6 +52,13 @@ def database_path() -> Path:
 def snippets_dir() -> Path:
     """Dossier des extraits d'images (créé s'il n'existe pas encore)."""
     path = data_dir() / SNIPPETS_DIRNAME
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def imports_dir() -> Path:
+    """Dossier où sont rangées les pages préparées de chaque partition importée."""
+    path = data_dir() / IMPORTS_DIRNAME
     path.mkdir(parents=True, exist_ok=True)
     return path
 
