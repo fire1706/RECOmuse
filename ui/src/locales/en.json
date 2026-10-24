@@ -109,7 +109,8 @@
     "page_not_found": "This page cannot be found.",
     "score_not_found": "This score cannot be found.",
     "rendering_failed": "The score could not be drawn.",
-    "edit_failed": "This change could not be made."
+    "edit_failed": "This change could not be made.",
+    "transposition_failed": "This transposition could not be made."
   },
   "scan": {
     "loading": "Loading the page…",
@@ -198,5 +199,67 @@
     "addNote": "Add a note after",
     "addRest": "Add a rest after",
     "remove": "Delete"
+  },
+  "transpose": {
+    "button": "Transpose…",
+    "title": "Transpose the part",
+    "source": "Instrument of this part",
+    "instrument": "Instrument",
+    "versionLabel": "Version",
+    "choose": "Choose…",
+    "detected": "Recognized from the name written on the part: correct it if needed.",
+    "how": "Transpose",
+    "forInstrument": "For another instrument",
+    "byInterval": "By an interval",
+    "target": "New instrument",
+    "needSource": "First choose the instrument of this part.",
+    "interval": "Interval",
+    "direction": "Direction",
+    "up": "up",
+    "down": "down",
+    "octave": "Octave",
+    "octaves": {
+      "none": "No octave change",
+      "up_one": "{{count}} octave higher",
+      "up_other": "{{count}} octaves higher",
+      "down_one": "{{count}} octave lower",
+      "down_other": "{{count}} octaves lower"
+    },
+    "advised": "(advised)",
+    "keyResult": "Resulting key signature: {{key}}.",
+    "outOfRange_one": "{{count}} note out of {{total}} is outside the range of the new instrument.",
+    "outOfRange_other": "{{count}} notes out of {{total}} are outside the range of the new instrument.",
+    "tryOctave": "Try: {{octave}}.",
+    "inRange": "All notes fit within the range of the new instrument.",
+    "create": "Create the transposed part",
+    "cancel": "Cancel",
+    "version": "in {{key}}, {{clef}}",
+    "intervalName": "{{instrument}} ({{interval}} {{direction}})",
+    "keys": {
+      "C": "C",
+      "Bb": "B♭",
+      "Eb": "E♭",
+      "F": "F",
+      "A": "A"
+    },
+    "intervals": {
+      "m2": "semitone",
+      "M2": "whole tone",
+      "m3": "minor third",
+      "M3": "major third",
+      "P4": "fourth",
+      "P5": "fifth",
+      "m6": "minor sixth",
+      "M6": "major sixth",
+      "P8": "octave"
+    },
+    "clefs": {
+      "treble": "treble clef",
+      "bass": "bass clef",
+      "alto": "alto clef",
+      "tenor": "tenor clef",
+      "percussion": "percussion clef",
+      "other": "other clef"
+    }
   }
 }

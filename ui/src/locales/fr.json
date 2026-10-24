@@ -109,7 +109,8 @@
     "page_not_found": "Cette page est introuvable.",
     "score_not_found": "Cette partition est introuvable.",
     "rendering_failed": "La partition n'a pas pu être dessinée.",
-    "edit_failed": "Cette modification n'a pas pu être faite."
+    "edit_failed": "Cette modification n'a pas pu être faite.",
+    "transposition_failed": "Cette transposition n'a pas pu être faite."
   },
   "scan": {
     "loading": "Chargement de la page…",
@@ -198,5 +199,67 @@
     "addNote": "Ajouter une note après",
     "addRest": "Ajouter un silence après",
     "remove": "Supprimer"
+  },
+  "transpose": {
+    "button": "Transposer…",
+    "title": "Transposer la partie",
+    "source": "Instrument de cette partie",
+    "instrument": "Instrument",
+    "versionLabel": "Version",
+    "choose": "Choisir…",
+    "detected": "Reconnu d'après le nom écrit sur la partie : corrigez-le s'il le faut.",
+    "how": "Transposer",
+    "forInstrument": "Pour un autre instrument",
+    "byInterval": "D'un intervalle",
+    "target": "Nouvel instrument",
+    "needSource": "Choisissez d'abord l'instrument de cette partie.",
+    "interval": "Intervalle",
+    "direction": "Sens",
+    "up": "vers l'aigu",
+    "down": "vers le grave",
+    "octave": "Octave",
+    "octaves": {
+      "none": "Sans changement d'octave",
+      "up_one": "{{count}} octave plus haut",
+      "up_other": "{{count}} octaves plus haut",
+      "down_one": "{{count}} octave plus bas",
+      "down_other": "{{count}} octaves plus bas"
+    },
+    "advised": "(conseillé)",
+    "keyResult": "Armure obtenue : {{key}}.",
+    "outOfRange_one": "{{count}} note sur {{total}} sort de l'étendue du nouvel instrument.",
+    "outOfRange_other": "{{count}} notes sur {{total}} sortent de l'étendue du nouvel instrument.",
+    "tryOctave": "Essayez : {{octave}}.",
+    "inRange": "Toutes les notes tiennent dans l'étendue du nouvel instrument.",
+    "create": "Créer la partie transposée",
+    "cancel": "Annuler",
+    "version": "en {{key}}, {{clef}}",
+    "intervalName": "{{instrument}} ({{interval}} {{direction}})",
+    "keys": {
+      "C": "ut",
+      "Bb": "si♭",
+      "Eb": "mi♭",
+      "F": "fa",
+      "A": "la"
+    },
+    "intervals": {
+      "m2": "demi-ton",
+      "M2": "ton",
+      "m3": "tierce mineure",
+      "M3": "tierce majeure",
+      "P4": "quarte",
+      "P5": "quinte",
+      "m6": "sixte mineure",
+      "M6": "sixte majeure",
+      "P8": "octave"
+    },
+    "clefs": {
+      "treble": "clé de sol",
+      "bass": "clé de fa",
+      "alto": "clé d'ut 3e ligne",
+      "tenor": "clé d'ut 4e ligne",
+      "percussion": "clé de percussion",
+      "other": "autre clé"
+    }
   }
 }

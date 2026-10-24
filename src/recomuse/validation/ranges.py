@@ -16,7 +16,7 @@ def check_ranges(model: ScoreModel, table: InstrumentTable | None = None) -> lis
     issues = []
     for part in model.parts:
         name = part.name or (model.instrument if len(model.parts) == 1 else None)
-        instrument = table.find(name)
+        instrument = table.get(model.instrument_id) or table.find(name)
         if instrument is None:
             continue
         for measure, note, clef in notes_with_clef(part):

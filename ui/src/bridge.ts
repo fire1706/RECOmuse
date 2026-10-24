@@ -149,6 +149,35 @@ export interface EditResult {
   corrections: number[]
 }
 
+/** Un instrument de la table (src/recomuse/instruments/instruments.json). */
+export interface InstrumentInfo {
+  id: string
+  /** Nom affiché, par langue. */
+  label: Record<string, string>
+  variants: { id: string; key: string | null; clef: string; transposable: boolean }[]
+}
+
+/** Instrument et version d'une partition (detected : reconnus d'après le nom). */
+export interface ScoreInstrument {
+  instrument_id: string | null
+  variant_id: string | null
+  detected: boolean
+}
+
+/** Une transposition demandée (voir src/recomuse/instruments/parts.py). */
+export type TranspositionRequest =
+  | { mode: 'instrument'; target: { instrument: string; variant: string }; octave: number; name?: string }
+  | { mode: 'interval'; interval: string; direction: 'up' | 'down'; octave: number; name?: string }
+
+/** Ce que donne une transposition : armures, notes hors de l'étendue, octave conseillée. */
+export interface TranspositionReport {
+  interval: { steps: number; semitones: number }
+  keys: number[]
+  notes: number
+  out_of_range: number
+  suggested_octave: number
+}
+
 /** Erreur renvoyée par le moteur : un code traduit par errors.<code>. */
 export interface EngineError {
   error: string
@@ -177,6 +206,14 @@ export interface PythonApi {
   get_measure(scoreId: number, measureId: string): Promise<MeasureDetails | EngineError>
   edit_score(scoreId: number, edit: Edit): Promise<EditResult | EngineError>
   undo_edit(scoreId: number): Promise<{ measure_id: string } | EngineError>
+  get_instruments(): Promise<InstrumentInfo[]>
+  get_score_instrument(scoreId: number): Promise<ScoreInstrument | EngineError>
+  set_score_instrument(scoreId: number, instrumentId: string, variantId: string): Promise<ScoreInstrument | EngineError>
+  check_transposition(scoreId: number, request: TranspositionRequest): Promise<TranspositionReport | EngineError>
+  transpose_score(
+    scoreId: number,
+    request: TranspositionRequest,
+  ): Promise<{ score: ScoreSummary; report: TranspositionReport } | EngineError>
 }
 
 /** Vrai si la réponse du moteur est une erreur. */

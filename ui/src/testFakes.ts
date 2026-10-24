@@ -68,6 +68,11 @@ export function fakeApi(overrides: Partial<PythonApi> = {}, info: AppInfo = fake
     get_measure: async () => ({ error: 'edit_failed' }),
     edit_score: async () => ({ error: 'edit_failed' }),
     undo_edit: async () => ({ error: 'edit_failed' }),
+    get_instruments: async () => [],
+    get_score_instrument: async () => ({ instrument_id: null, variant_id: null, detected: true }),
+    set_score_instrument: async () => ({ error: 'transposition_failed' }),
+    check_transposition: async () => ({ error: 'transposition_failed' }),
+    transpose_score: async () => ({ error: 'transposition_failed' }),
     ...overrides,
   }
 }

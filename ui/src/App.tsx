@@ -15,6 +15,7 @@ import MeasureEditor from './MeasureEditor'
 import QuestionPanel from './QuestionPanel'
 import ScanView from './ScanView'
 import ScoreView from './ScoreView'
+import TransposeDialog from './TransposeDialog'
 import './App.css'
 
 /** État de la connexion au moteur Python. */
@@ -67,6 +68,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
   const [version, setVersion] = useState(0)
   // Change après une modification manuelle : les questions sont recalculées.
   const [editVersion, setEditVersion] = useState(0)
+  const [transposing, setTransposing] = useState(false)
   const poll = useRef<number | null>(null)
 
   useEffect(() => {
@@ -176,6 +178,11 @@ export default function App({ connect = waitForBridge }: AppProps) {
           <button type="button" onClick={openScore} disabled={!connected || reading !== null}>
             {t('open.button')}
           </button>
+          {scoreId !== null && (
+            <button type="button" onClick={() => setTransposing(true)} disabled={!connected || reading !== null}>
+              {t('transpose.button')}
+            </button>
+          )}
           {scores.length > 0 && (
             <label className="score-picker">
               {t('scores.label')}
@@ -255,6 +262,16 @@ export default function App({ connect = waitForBridge }: AppProps) {
           )}
         </section>
       </main>
+
+      {transposing && engine.kind === 'connected' && scoreId !== null && (
+        <TransposeDialog api={engine.api} scoreId={scoreId} onClose={() => setTransposing(false)}
+          onCreated={(score) => {
+            const known = [score, ...scores]
+            setScores(known)
+            setTransposing(false)
+            chooseScore(score.score_id, known)
+          }} />
+      )}
 
       <footer className="status-bar" role="status">
         {engine.kind === 'connecting' && t('status.connecting')}

@@ -291,7 +291,7 @@ def test_instrument_table():
     assert table.find("Solo Bb Cornet").id == "trumpet"
     assert table.find("Klarinette 2 in B").id == "clarinet"
     assert table.find("Clarinette basse").id == "bass_clarinet"
-    assert table.find("Alto Saxophone 1").id == "saxophone"
+    assert table.find("Alto Saxophone 1").id == "alto_saxophone"
     assert table.find("Cor 2 en Fa").id == "horn"
     assert table.find("Vocals") is None
     assert parse_note("Bb3") == midi_number("B", -1, 3) == 58

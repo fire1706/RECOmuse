@@ -11,7 +11,7 @@ une clé, une armure, une indication de mesure, une pause multiple. Chaque symbo
 - sa confiance (0 à 1) : 1 pour une lecture vectorielle exacte, la note d'Audiveris sinon ;
 - ses alternatives (autres valeurs possibles) ;
 - sa source : « vector », « audiveris », ou celle de sa dernière correction (« user »,
-  « rule », « validator »).
+  « rule », « validator »), ou « transposed » pour une partie transposée.
 L'historique de ses valeurs n'est pas recopié ici : il est dans le journal des corrections
 (learning/journal.py), qui reste la seule référence.
 
@@ -29,7 +29,7 @@ MODEL_VERSION = 1
 SymbolKind = Literal["note", "rest", "clef", "key", "time", "multirest"]
 # Qui a donné sa valeur actuelle au symbole : lecture vectorielle, Audiveris, l'utilisateur
 # (question ou édition), une règle apprise, ou le validateur musical.
-SymbolSource = Literal["vector", "audiveris", "user", "rule", "validator"]
+SymbolSource = Literal["vector", "audiveris", "user", "rule", "validator", "transposed"]
 
 # Champs de la valeur de chaque type de symbole (documentation et contrôle).
 VALUE_FIELDS: dict[str, tuple[str, ...]] = {
@@ -135,6 +135,12 @@ class ScoreModel:
     parts: list[Part] = field(default_factory=list)
     pages: list[PageInfo] = field(default_factory=list)
     version: int = MODEL_VERSION
+    # Instrument et version de la partie (table des instruments), quand ils sont connus :
+    # choisis par l'utilisateur, ou ceux d'une partie transposée.
+    instrument_id: str | None = None
+    variant_id: str | None = None
+    # Partition d'origine d'une partie transposée (numéro dans la base).
+    transposed_from: int | None = None
 
     # --- Recherche -----------------------------------------------------------------------
 

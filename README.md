@@ -32,6 +32,10 @@ armure, chiffrage, pause multiple, et pour chaque note sa hauteur (flèches ↑ 
 altération, sa durée, ses points, sa liaison ; ajouter ou supprimer (Suppr) une note.
 Chaque modification est une correction du journal ; « Annuler ma dernière modification »
 la défait.
+Transposition : « Transposer… » réécrit la partie pour un autre instrument (par exemple
+une partie de trombone en clé de fa pour un baryton en si♭ en clé de sol) ou d'un
+intervalle, et crée une nouvelle partition ; la table des instruments est le fichier
+`src/recomuse/instruments/instruments.json`.
 
 Tests : `.venv\Scripts\python -m pytest` à la racine, `npm test` dans `ui/`.
 Tests lents, sur demande : `-m corpus` (vraies partitions de `tests/corpus/` ou `test/corpus/`)

@@ -27,6 +27,7 @@ from pathlib import Path
 from recomuse import __version__, editing, library
 from recomuse.importer import ScoreImportError
 from recomuse.importer.loading import IMAGE_EXTENSIONS
+from recomuse.instruments import parts as instruments
 from recomuse.learning.corrections import CorrectionError, CorrectionService
 from recomuse.learning.journal import CorrectionJournal
 from recomuse.model.store import load_model
@@ -154,6 +155,34 @@ class Api:
             return {"measure_id": measure_id}
         return self._guarded(undo)
 
+    # --- Instruments et transposition ------------------------------------------------------
+
+    def get_instruments(self) -> list[dict]:
+        """Table des instruments, pour les choix de l'interface."""
+        return instruments.table_for_interface()
+
+    def get_score_instrument(self, score_id: int) -> dict:
+        """Instrument et version d'une partition (choisis, ou reconnus d'après son nom)."""
+        def read():
+            model = load_model(self._conn, score_id)
+            if model is None:
+                raise instruments.TranspositionError(f"Partition n° {score_id} introuvable.")
+            return instruments.instrument_of(model)
+        return self._guarded(read)
+
+    def set_score_instrument(self, score_id: int, instrument_id: str, variant_id: str) -> dict:
+        """L'utilisateur corrige l'instrument de la partie."""
+        return self._guarded(
+            lambda: instruments.set_instrument(self._conn, score_id, instrument_id, variant_id))
+
+    def check_transposition(self, score_id: int, request: dict) -> dict:
+        """Ce que donnerait une transposition (voir instruments.parts)."""
+        return self._guarded(lambda: instruments.check(self._conn, score_id, request))
+
+    def transpose_score(self, score_id: int, request: dict) -> dict:
+        """Crée la partition transposée : {"score": résumé, "report": compte rendu}."""
+        return self._guarded(lambda: instruments.transpose_score(self._conn, score_id, request))
+
     # --- Questions ------------------------------------------------------------------------
 
     def get_questions(self, score_id: int) -> dict:
@@ -186,6 +215,9 @@ class Api:
         except editing.EditError:
             log.exception("Modification impossible")
             return {"error": "edit_failed"}
+        except instruments.TranspositionError:
+            log.exception("Transposition impossible")
+            return {"error": "transposition_failed"}
         except Exception:
             log.exception("Erreur inattendue")
             return {"error": "unexpected"}
