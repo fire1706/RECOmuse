@@ -9,6 +9,7 @@ Fichiers du module :
 - from_audiveris.py : construction depuis le MusicXML d'Audiveris + le .omr ;
 - build.py          : assemblage, page par page (build_model) ;
 - split.py          : séparation des parties d'un PDF qui les contient toutes (split_parts) ;
+- conductor.py      : conducteurs (instruments, parties extraites, conducteur assemblé) ;
 - store.py          : enregistrement dans la base locale ;
 - snippets.py       : découpe des extraits d'image.
 

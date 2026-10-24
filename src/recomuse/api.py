@@ -44,6 +44,14 @@ log = logging.getLogger(__name__)
 OPEN_EXTENSIONS = (".pdf", *sorted(IMAGE_EXTENSIONS))
 
 
+class LibraryError(RuntimeError):
+    """Demande impossible sur les partitions ; `code` est traduit par l'interface."""
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
+
+
 class Api:
     """Fonctions du moteur exposées à l'interface."""
 
@@ -200,6 +208,31 @@ class Api:
             return {"rules": [rule.to_dict() for rule in rules.learned_rules(self._conn)]}
         return self._guarded(update)
 
+    # --- Conducteurs -----------------------------------------------------------------------
+
+    def extract_parts(self, score_id: int) -> dict:
+        """Une partition par instrument du conducteur : {"scores": [résumés]}."""
+        def extract():
+            scores = library.extract_parts(self._conn, score_id)
+            if not scores:
+                raise LibraryError("not_a_conductor")
+            return {"scores": scores}
+        return self._guarded(extract)
+
+    def get_piece_scores(self, score_id: int) -> list[dict]:
+        """Partitions du même morceau (pour choisir celles d'un conducteur)."""
+        with self._db:
+            return library.piece_scores(self._conn, score_id)
+
+    def assemble_conductor(self, score_ids: list[int]) -> dict:
+        """Conducteur fait de ces partitions : {"score": résumé}."""
+        def assemble():
+            result = library.assemble_conductor(self._conn, [int(i) for i in score_ids])
+            if result is None:
+                raise LibraryError("conductor_needs_parts")
+            return {"score": result}
+        return self._guarded(assemble)
+
     # --- Packs d'apprentissage -------------------------------------------------------------
 
     def choose_pack_file(self, save: bool, filter_label: str, default_name: str = "") -> str | None:
@@ -315,6 +348,8 @@ class Api:
             return {"error": error.code}
         except packs.PackError as error:
             log.exception("Pack impossible")
+            return {"error": error.code}
+        except LibraryError as error:
             return {"error": error.code}
         except OSError:
             log.exception("Fichier impossible à écrire")

@@ -66,7 +66,7 @@ describe('mémoire et règles dans les autres écrans', () => {
       choose_file: async () => 'C:/partitions/marche.pdf',
       open_file: async () => ({
         scores: [{
-          score_id: 4, title: 'Marche', instrument: 'Flûte', source_name: 'marche.pdf', pages: [1], measure_count: 40,
+          score_id: 4, title: 'Marche', instrument: 'Flûte', source_name: 'marche.pdf', pages: [1], measure_count: 40, instruments: [], derived: null,
           memory: { from: 1, applied: 12, skipped: 1, answers: 3, read_at: '2026-10-20T10:00:00.000Z' },
         }],
       }),

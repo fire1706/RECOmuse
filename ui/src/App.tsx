@@ -17,6 +17,7 @@ import QuestionPanel from './QuestionPanel'
 import RulesDialog from './RulesDialog'
 import ScanView from './ScanView'
 import ScoreView from './ScoreView'
+import ConductorDialog from './ConductorDialog'
 import ExportDialog from './ExportDialog'
 import TransposeDialog from './TransposeDialog'
 import './App.css'
@@ -77,6 +78,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
   const [exporting, setExporting] = useState(false)
   const [showRules, setShowRules] = useState(false)
   const [showPacks, setShowPacks] = useState(false)
+  const [showConductor, setShowConductor] = useState(false)
   const poll = useRef<number | null>(null)
 
   useEffect(() => {
@@ -176,6 +178,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
   }
 
   const connected = engine.kind === 'connected'
+  const current = scores.find((s) => s.score_id === scoreId) ?? null
 
   return (
     <div className="app">
@@ -191,6 +194,11 @@ export default function App({ connect = waitForBridge }: AppProps) {
           {scoreId !== null && (
             <button type="button" onClick={() => setTransposing(true)} disabled={!connected || reading !== null}>
               {t('transpose.button')}
+            </button>
+          )}
+          {scoreId !== null && (
+            <button type="button" onClick={() => setShowConductor(true)} disabled={!connected || reading !== null}>
+              {t('conductor.button')}
             </button>
           )}
           {scoreId !== null && (
@@ -249,7 +257,9 @@ export default function App({ connect = waitForBridge }: AppProps) {
             <ScanView api={engine.api} scoreId={scoreId} page={page} version={version}
               selectedMeasure={selected} onPage={setPage} onSelect={focusMeasure} />
           ) : (
-            <p className="empty">{t('panels.scanEmpty')}</p>
+            <p className="empty">
+              {current?.derived === 'assembled' ? t('conductor.noPages') : t('panels.scanEmpty')}
+            </p>
           )}
         </section>
         <section className="panel panel-questions" aria-labelledby="panel-questions">
@@ -312,6 +322,16 @@ export default function App({ connect = waitForBridge }: AppProps) {
 
       {exporting && engine.kind === 'connected' && scoreId !== null && (
         <ExportDialog api={engine.api} scoreId={scoreId} onClose={() => setExporting(false)} />
+      )}
+
+      {showConductor && engine.kind === 'connected' && current && (
+        <ConductorDialog api={engine.api} score={current} onClose={() => setShowConductor(false)}
+          onCreated={(created) => {
+            const known = [...created, ...scores]
+            setScores(known)
+            setShowConductor(false)
+            chooseScore(created[0]?.score_id ?? null, known)
+          }} />
       )}
 
       {showPacks && engine.kind === 'connected' && (

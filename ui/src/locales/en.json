@@ -119,7 +119,9 @@
     "unknown_format": "Unknown export format.",
     "not_a_pack": "This file is not a RECOmuse learning pack.",
     "pack_too_new": "This pack was made by a newer version of RECOmuse: update RECOmuse.",
-    "pack_already_imported": "This pack has already been imported."
+    "pack_already_imported": "This pack has already been imported.",
+    "not_a_conductor": "This score has a single instrument: there are no parts to extract.",
+    "conductor_needs_parts": "At least two parts are needed to assemble a conductor score."
   },
   "scan": {
     "loading": "Loading the page…",
@@ -423,5 +425,26 @@
     "scores_zero": "no parts",
     "scores_one": "{{count}} corrected part",
     "scores_other": "{{count}} corrected parts"
+  },
+  "conductor": {
+    "button": "Conductor…",
+    "title": "Conductor score",
+    "cancel": "Close",
+    "isConductor_one": "This score contains {{count}} instrument:",
+    "isConductor_other": "This score is a conductor score with {{count}} instruments:",
+    "unnamed": "Staff {{number}} (unnamed)",
+    "extractHelp": "Extracting the parts creates one score per instrument, with the corrections already made on the conductor score. The conductor score does not change.",
+    "extract_one": "Extract {{count}} part",
+    "extract_other": "Extract the {{count}} parts",
+    "assembleHelp": "Assembling a conductor score gathers the ticked parts (same piece) into one score, in the usual order: woodwinds, brass, rhythm section, percussion. Each instrument keeps its transposition on export.",
+    "alone": "No other part of this piece has been read yet: open the other parts first.",
+    "assemble_one": "Assemble {{count}} part",
+    "assemble_other": "Assemble the {{count}} parts",
+    "aConductor": "conductor score",
+    "derived": {
+      "extracted": "extracted from a conductor score",
+      "assembled": "assembled conductor score"
+    },
+    "noPages": "Conductor score assembled from several files: it has no original pages. Open one of the parts to see its scan."
   }
 }

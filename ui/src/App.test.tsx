@@ -78,7 +78,7 @@ describe('App', () => {
     await act(async () =>
       finish({
         scores: [
-          { score_id: 1, title: 'Marche', instrument: 'Flûte', source_name: 'marche.pdf', pages: [1], measure_count: 40 },
+          { score_id: 1, title: 'Marche', instrument: 'Flûte', source_name: 'marche.pdf', pages: [1], measure_count: 40, instruments: [], derived: null },
         ],
       }),
     )
@@ -89,7 +89,7 @@ describe('App', () => {
 
   it('annonce les parties trouvées dans un PDF groupé', async () => {
     const part = (id: number, instrument: string) => ({
-      score_id: id, title: "Throwin' Down", instrument, source_name: 'parts.pdf', pages: [id], measure_count: 109,
+      score_id: id, title: "Throwin' Down", instrument, source_name: 'parts.pdf', pages: [id], measure_count: 109, instruments: [], derived: null,
     })
     const api = fakeApi({
       choose_file: async () => 'C:/partitions/parts.pdf',
@@ -106,7 +106,7 @@ describe('App', () => {
 describe('groupByPiece', () => {
   it('regroupe les parties de même titre, accents et ponctuation mis à part', () => {
     const score = (id: number, title: string | null) => ({
-      score_id: id, title, instrument: null, source_name: null, pages: [], measure_count: 0,
+      score_id: id, title, instrument: null, source_name: null, pages: [], measure_count: 0, instruments: [], derived: null,
     })
     const groups = groupByPiece(
       [score(1, 'Marche d’Acoz'), score(2, 'Zorba'), score(3, "MARCHE D'ACOZ"), score(4, null)],

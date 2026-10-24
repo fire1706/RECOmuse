@@ -51,6 +51,15 @@ def build_model(score: ImportedScore, recognition: RecognitionResult | None = No
         model.composers = list(header.composers)
     if len(model.parts) == 1:
         model.parts[0].name = model.instrument
+    else:
+        # Conducteur : le nom de chaque portée (écrit à sa gauche, ou lu par Audiveris).
+        names = vector.staff_names() if vector is not None and by_vector else []
+        if recognition is not None and recognition.movements:
+            audiveris_names = recognition.movements[0].part_names
+            names = [n or (audiveris_names[k] if k < len(audiveris_names) else None)
+                     for k, n in enumerate(names or [None] * len(model.parts))]
+        for part, name in zip(model.parts, names, strict=False):
+            part.name = name
 
     ran_audiveris = recognition is not None and recognition.run is not None
     by_audiveris = set(recognition.run.book.sheet_pages) if ran_audiveris else set()

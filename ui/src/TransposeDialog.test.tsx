@@ -36,7 +36,7 @@ const report = (extra: Partial<TranspositionReport> = {}): TranspositionReport =
 function setup() {
   const check_transposition = vi.fn(async () => report())
   const transpose_score = vi.fn(async () => ({
-    score: { score_id: 9, title: 'Marche', instrument: 'Euphonium / baryton en si♭, clé de sol', source_name: null, pages: [1], measure_count: 40 },
+    score: { score_id: 9, title: 'Marche', instrument: 'Euphonium / baryton en si♭, clé de sol', source_name: null, pages: [1], measure_count: 40, instruments: [], derived: null },
     report: report(),
   }))
   const set_score_instrument = vi.fn(async () => ({ instrument_id: 'euphonium', variant_id: 'bb_treble', detected: false }))

@@ -21,6 +21,10 @@ export interface ScoreSummary {
   source_name: string | null
   pages: number[]
   measure_count: number
+  /** Conducteur : le nom de chacun de ses instruments (vide pour une partie). */
+  instruments: (string | null)[]
+  /** Partition tirée d'autres : partie extraite d'un conducteur, conducteur assemblé. */
+  derived: 'extracted' | 'assembled' | null
   /** Partie déjà lue et corrigée : corrections et réponses reprises (à l'ouverture). */
   memory?: {
     from?: number
@@ -273,6 +277,9 @@ export interface PythonApi {
   get_export_options(scoreId: number): Promise<ExportOptions | EngineError>
   choose_save_path(filterLabel: string, defaultName: string, format: ExportFormat): Promise<string | null>
   export_score(scoreId: number, format: ExportFormat, path: string): Promise<ExportResult | EngineError>
+  extract_parts(scoreId: number): Promise<{ scores: ScoreSummary[] } | EngineError>
+  get_piece_scores(scoreId: number): Promise<ScoreSummary[]>
+  assemble_conductor(scoreIds: number[]): Promise<{ score: ScoreSummary } | EngineError>
   get_rules(): Promise<Rule[]>
   set_rule_enabled(key: string, enabled: boolean): Promise<{ rules: Rule[] } | EngineError>
   choose_pack_file(save: boolean, filterLabel: string, defaultName: string): Promise<string | null>

@@ -109,6 +109,10 @@ class Part:
     id: str
     name: str | None = None
     measures: list[Measure] = field(default_factory=list)
+    # Instrument et version de la partie, quand ils sont connus (conducteur assemblé à
+    # partir de parties dont l'instrument a été choisi) ; sinon, reconnus d'après le nom.
+    instrument_id: str | None = None
+    variant_id: str | None = None
 
 
 @dataclass
@@ -141,6 +145,10 @@ class ScoreModel:
     variant_id: str | None = None
     # Partition d'origine d'une partie transposée (numéro dans la base).
     transposed_from: int | None = None
+    # Partition tirée d'autres : « extracted » (partie extraite d'un conducteur) ou
+    # « assembled » (conducteur assemblé à partir de parties) ; et ses sources.
+    derived: str | None = None
+    derived_from: list[int] = field(default_factory=list)
 
     # --- Recherche -----------------------------------------------------------------------
 

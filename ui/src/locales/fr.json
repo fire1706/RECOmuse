@@ -119,7 +119,9 @@
     "unknown_format": "Format d'export inconnu.",
     "not_a_pack": "Ce fichier n'est pas un pack d'apprentissage RECOmuse.",
     "pack_too_new": "Ce pack a été fait par une version plus récente de RECOmuse : mettez RECOmuse à jour.",
-    "pack_already_imported": "Ce pack a déjà été importé."
+    "pack_already_imported": "Ce pack a déjà été importé.",
+    "not_a_conductor": "Cette partition n'a qu'un instrument : il n'y a pas de parties à extraire.",
+    "conductor_needs_parts": "Il faut au moins deux parties pour assembler un conducteur."
   },
   "scan": {
     "loading": "Chargement de la page…",
@@ -423,5 +425,26 @@
     "scores_zero": "aucune partie",
     "scores_one": "{{count}} partie corrigée",
     "scores_other": "{{count}} parties corrigées"
+  },
+  "conductor": {
+    "button": "Conducteur…",
+    "title": "Conducteur",
+    "cancel": "Fermer",
+    "isConductor_one": "Cette partition réunit {{count}} instrument :",
+    "isConductor_other": "Cette partition est un conducteur de {{count}} instruments :",
+    "unnamed": "Portée {{number}} (sans nom)",
+    "extractHelp": "Extraire les parties crée une partition par instrument, avec les corrections déjà faites sur le conducteur. Le conducteur ne change pas.",
+    "extract_one": "Extraire {{count}} partie",
+    "extract_other": "Extraire les {{count}} parties",
+    "assembleHelp": "Assembler un conducteur réunit les parties cochées (même morceau) en une seule partition, dans l'ordre habituel : bois, cuivres, accompagnement, percussions. Chaque instrument garde sa transposition à l'export.",
+    "alone": "Aucune autre partie de ce morceau n'a encore été lue : ouvrez d'abord les autres parties.",
+    "assemble_one": "Assembler {{count}} partie",
+    "assemble_other": "Assembler les {{count}} parties",
+    "aConductor": "conducteur",
+    "derived": {
+      "extracted": "extraite d'un conducteur",
+      "assembled": "conducteur assemblé"
+    },
+    "noPages": "Conducteur assemblé à partir de plusieurs fichiers : il n'a pas de pages d'origine. Ouvrez une des parties pour voir son scan."
   }
 }

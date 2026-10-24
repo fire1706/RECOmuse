@@ -5,15 +5,23 @@ il n'y a qu'une portée par système (rang 0) ; dans un conducteur, le rang 3 es
 4e portée de chaque système. Les mesures sont numérotées dans l'ordre de lecture,
 à partir de 1, une pause multiple comptant pour autant de mesures qu'elle en annonce.
 (La première mesure peut être une levée : le numéro imprimé, s'il existe, le dira.)
+
+Dans un conducteur, le nom de chaque instrument est écrit à gauche de sa portée (en entier
+au premier système, souvent abrégé ensuite) : staff_names() le retrouve pour chaque rang.
 """
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pymupdf
 
 from recomuse.importer.detection import analyze_pdf_page
-from recomuse.vector.reader import Measure, VectorPage, read_page
+from recomuse.vector.primitives import TextLine
+from recomuse.vector.reader import Measure, StaffContent, VectorPage, read_page
+
+# Un nom d'instrument contient des lettres (un nombre seul est un numéro de mesure).
+_HAS_LETTERS = re.compile(r"[A-Za-zÀ-ÿ]")
 
 
 @dataclass(frozen=True)
@@ -38,6 +46,17 @@ class VectorScore:
     def staff_count(self) -> int:
         """Nombre de portées par système (le plus grand rencontré)."""
         return max((len(system) for page in self.pages for system in page.systems), default=0)
+
+    def staff_names(self) -> list[str | None]:
+        """Nom de l'instrument de chaque rang de portée (None s'il n'est pas écrit) : celui
+        du premier système où il apparaît, d'ordinaire le nom complet."""
+        names: list[str | None] = [None] * self.staff_count
+        for page in self.pages:
+            for system in page.systems:
+                for rank, label in enumerate(system_labels(page.texts, system)):
+                    if label and names[rank] is None:
+                        names[rank] = label
+        return names
 
     def part_measures(self, rank: int = 0) -> list[PartMeasure]:
         """Mesures de la partie de rang `rank`, dans l'ordre de lecture."""
@@ -133,3 +152,31 @@ def read_vector_pdf(path: Path | str, page_numbers: list[int] | None = None) -> 
             if vector_page.systems:
                 pages.append(vector_page)
     return VectorScore(source_path=path, pages=pages, warnings=sorted(warnings))
+
+
+def system_labels(texts: list[TextLine], system: list[StaffContent]) -> list[str | None]:
+    """Nom écrit à gauche de chaque portée d'un système. Un nom placé entre deux portées
+    (accolade du piano) vaut pour les deux ; un nom sur deux lignes (« Trumpet » /
+    « in B♭ 1 ») est réuni."""
+    if not system:
+        return []
+    staves = [content.staff for content in system]
+    left = min(staff.x0 for staff in staves)
+    interline = min(staff.interline for staff in staves)
+    found: list[list[TextLine]] = [[] for _ in staves]
+    for text in texts:
+        if text.x1 > left + interline or not _HAS_LETTERS.search(text.text):
+            continue
+        middle = (text.y0 + text.y1) / 2
+        inside = [k for k, staff in enumerate(staves)
+                  if staff.top - interline <= middle <= staff.bottom + interline]
+        between = [k for k in range(len(staves) - 1)
+                   if staves[k].bottom < middle < staves[k + 1].top]
+        if inside:
+            found[min(inside, key=lambda k: abs((staves[k].top + staves[k].bottom) / 2
+                                                - middle))].append(text)
+        elif between:
+            found[between[0]].append(text)
+            found[between[0] + 1].append(text)
+    return [" ".join(t.text for t in sorted(group, key=lambda t: t.y0)) or None
+            for group in found]

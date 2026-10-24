@@ -13,8 +13,10 @@ from pathlib import Path
 from recomuse.export.midi import model_to_midi
 from recomuse.export.musescore import MuseScoreError, convert, find_musescore
 from recomuse.export.musicxml import model_to_musicxml
+from recomuse.export.notation import exported_parts
 from recomuse.instruments.parts import instrument_of
-from recomuse.instruments.table import load_table
+from recomuse.instruments.table import InstrumentTable, load_table
+from recomuse.model import conductor
 from recomuse.model.score import ScoreModel
 from recomuse.model.store import load_model
 
@@ -28,6 +30,22 @@ class ExportError(RuntimeError):
     def __init__(self, code: str) -> None:
         self.code = code
         super().__init__(code)
+
+
+def _part_instruments(model: ScoreModel, table: InstrumentTable) -> list:
+    """Instrument et version de chaque partie exportée d'un conducteur."""
+    result = []
+    for group in exported_parts(model):
+        part = group[0]
+        instrument = table.get(part.instrument_id)
+        variant = instrument.variant(part.variant_id) if instrument else None
+        if variant is None:
+            clef = next((s for m in part.measures for s in m.attributes if s.kind == "clef"),
+                        None)
+            found = table.detect(part.name, clef.value.get("sign") if clef else None)
+            instrument, variant = found if found else (None, None)
+        result.append((instrument, variant))
+    return result
 
 
 def default_name(model: ScoreModel) -> str:
@@ -50,15 +68,18 @@ def export_score(conn: sqlite3.Connection, score_id: int, fmt: str, path: Path |
     known = instrument_of(model, table)
     instrument = table.get(known["instrument_id"])
     variant = instrument.variant(known["variant_id"]) if instrument else None
+    # Conducteur : chaque partie a son instrument (choisi, ou reconnu d'après son nom).
+    instruments = (_part_instruments(model, table) if conductor.is_conductor(model)
+                   else None)
 
     path = Path(path)
     if path.suffix.lower() != FORMATS[fmt]:
         path = path.with_name(path.name + FORMATS[fmt])
     path.parent.mkdir(parents=True, exist_ok=True)
     if fmt == "midi":
-        path.write_bytes(model_to_midi(model, instrument, variant))
+        path.write_bytes(model_to_midi(model, instrument, variant, instruments))
         return {"path": str(path), "format": fmt, "fallback": None}
-    musicxml = model_to_musicxml(model, instrument, variant)
+    musicxml = model_to_musicxml(model, instrument, variant, instruments)
     if fmt == "musicxml":
         path.write_text(musicxml, encoding="utf-8")
         return {"path": str(path), "format": fmt, "fallback": None}

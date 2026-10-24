@@ -26,15 +26,23 @@ SNARE, HI_HAT = 38, 42             # sons de batterie (têtes normales, têtes e
 
 
 def model_to_midi(model: ScoreModel, instrument: Instrument | None = None,
-                  variant: Variant | None = None) -> bytes:
-    """Fichier MIDI de la partition (octets prêts à écrire)."""
-    shift = variant.transpose.semitones if variant and variant.transpose else 0
-    program = (instrument.midi_program if instrument else 1) - 1
-    staves = [part for group in exported_parts(model) for part in group]
-    timeline = _timeline(staves[0].measures) if staves else []
-    tracks = [_conductor(model, staves[0].measures if staves else [], timeline)]
+                  variant: Variant | None = None,
+                  instruments: list[tuple[Instrument | None, Variant | None]] | None = None
+                  ) -> bytes:
+    """Fichier MIDI de la partition (octets prêts à écrire). `instruments` : pour un
+    conducteur, l'instrument de chaque partie (voir notation.exported_parts)."""
+    groups = exported_parts(model)
+    if instruments is None:
+        instruments = [(instrument, variant)] * len(groups)
+    staves = [(part, instruments[n] if n < len(instruments) else (None, None))
+              for n, group in enumerate(groups) for part in group]
+    timeline = _timeline(staves[0][0].measures) if staves else []
+    tracks = [_conductor(model, staves[0][0].measures if staves else [], timeline)]
     channel = 0
-    for staff in staves:
+    for staff, (this_instrument, this_variant) in staves:
+        shift = this_variant.transpose.semitones if this_variant and this_variant.transpose \
+            else 0
+        program = (this_instrument.midi_program if this_instrument else 1) - 1
         percussion = any(s.kind == "clef" and s.value.get("sign") == "percussion"
                          for m in staff.measures for s in m.attributes)
         if percussion:

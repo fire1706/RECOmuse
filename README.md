@@ -47,6 +47,9 @@ pages) reprend ses corrections quand on la rouvre.
 Packs d'apprentissage : « Packs… » crée un fichier .recomuse-pack (réponses et corrections,
 sans aucune image ni partition) à envoyer aux autres membres, qui l'importent : leurs
 règles apprises en profitent, et la même partie ouverte chez eux reprend les corrections.
+Conducteurs : un conducteur est lu avec le nom de chaque instrument (écrit à gauche des
+portées) ; « Conducteur… » en extrait les parties, ou assemble un conducteur à partir des
+parties d'un même morceau. À l'export, chaque instrument garde son son et sa transposition.
 
 Tests : `.venv\Scripts\python -m pytest` à la racine, `npm test` dans `ui/`.
 Tests lents, sur demande : `-m corpus` (vraies partitions de `tests/corpus/` ou `test/corpus/`)

@@ -28,10 +28,16 @@ VOICES_PER_STAFF = 4
 
 
 def model_to_musicxml(model: ScoreModel, instrument: Instrument | None = None,
-                      variant: Variant | None = None) -> str:
+                      variant: Variant | None = None,
+                      instruments: list[tuple[Instrument | None, Variant | None]] | None = None
+                      ) -> str:
     """Texte MusicXML de la partition. `instrument`, `variant` : l'instrument de la partie
-    (son MIDI et transposition) ; sans eux, la partie est écrite comme elle sonne."""
+    (son MIDI et transposition) ; sans eux, la partie est écrite comme elle sonne.
+    `instruments` : pour un conducteur, l'instrument de chaque partie (voir
+    notation.exported_parts), à la place."""
     groups = exported_parts(model)
+    if instruments is None:
+        instruments = [(instrument, variant if n == 0 else None) for n in range(len(groups))]
     divisions = _divisions(model)
     out = ['<?xml version="1.0" encoding="UTF-8" standalone="no"?>',
            ('<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" '
@@ -49,7 +55,8 @@ def model_to_musicxml(model: ScoreModel, instrument: Instrument | None = None,
     for n, staves in enumerate(groups, 1):
         name = staves[0].name or model.instrument or ""
         percussion = _is_percussion(staves[0])
-        program = instrument.midi_program if instrument else 1
+        this_instrument = instruments[n - 1][0] if n <= len(instruments) else None
+        program = this_instrument.midi_program if this_instrument else 1
         channel = 10 if percussion else n % 16 or 1      # le canal 10 est celui des batteries
         out.append(f'<score-part id="P{n}"><part-name>{escape(name)}</part-name>'
                    f'<score-instrument id="P{n}-I1"><instrument-name>{escape(name)}'
@@ -61,7 +68,8 @@ def model_to_musicxml(model: ScoreModel, instrument: Instrument | None = None,
 
     for n, staves in enumerate(groups, 1):
         out.append(f'<part id="P{n}">')
-        out += _part(model, staves, divisions, variant if n == 1 else None)
+        out += _part(model, staves, divisions,
+                     instruments[n - 1][1] if n <= len(instruments) else None, with_tempo=n == 1)
         out.append("</part>")
     out.append("</score-partwise>")
     return "\n".join(out)
@@ -91,7 +99,9 @@ def _ticks(duration: Fraction | None, divisions: int) -> int:
 
 
 def _part(model: ScoreModel, staves: list[Part], divisions: int,
-          variant: Variant | None) -> list[str]:
+          variant: Variant | None, with_tempo: bool = True) -> list[str]:
+    """Mesures d'une partie. `with_tempo` : la première partie porte le tempo (une seule
+    fois dans un conducteur)."""
     out: list[str] = []
     number = 1
     fifths = [0] * len(staves)
@@ -108,7 +118,7 @@ def _part(model: ScoreModel, staves: list[Part], divisions: int,
 
         out.append(f'<measure number="{number}">')
         out += _attributes(measures, index == 0, divisions, fifths, variant, len(staves), count)
-        if index == 0 and model.tempo:
+        if index == 0 and with_tempo and model.tempo:
             out.append('<direction placement="above"><direction-type>'
                        f"<words>{escape(model.tempo)}</words></direction-type></direction>")
         for mark in first.marks:
@@ -183,7 +193,9 @@ def _attributes(measures: list[Measure], first: bool, divisions: int, fifths: li
             parts.append(_clef(clef.value, rank if staves > 1 else None))
         elif first:
             parts.append(_clef({"sign": "G", "line": 2}, rank if staves > 1 else None))
-    if first and variant is not None and variant.transpose is not None:
+    transposes = (variant is not None and variant.transpose is not None
+                  and (variant.transpose.steps or variant.transpose.semitones))
+    if first and transposes:
         parts.append(_transpose(variant))
     if count > 1:
         parts.append(f"<measure-style><multiple-rest>{count}</multiple-rest></measure-style>")

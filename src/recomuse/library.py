@@ -5,6 +5,8 @@ import (pages préparées à 300 dpi) → reconnaissance (lecture vectorielle, A
 textes) → modèle interne → séparation des parties (un PDF peut les contenir toutes).
 Chaque partie devient une partition de la base, avec son modèle. Les parties d'un même
 morceau (même titre) sont comparées entre elles pour poser les questions (piece_of).
+Un conducteur (tous les instruments sur chaque système) peut être découpé en parties, et
+des parties séparées réunies en un conducteur (model/conductor.py).
 Une partie déjà lue et corrigée (mêmes pages : learning/memory.py) reprend ses
 corrections et ses réponses aux questions ; à défaut, celles d'un pack d'apprentissage
 reçu d'un autre membre (learning/packs.py).
@@ -23,6 +25,7 @@ from recomuse.export.mei import model_to_mei
 from recomuse.importer import import_score, register_score
 from recomuse.learning import memory, packs
 from recomuse.learning.corrections import CorrectionService
+from recomuse.model import conductor
 from recomuse.model.build import build_model
 from recomuse.model.score import ScoreModel
 from recomuse.model.split import normalized, split_parts
@@ -158,7 +161,62 @@ def summary(score_id: int, model: ScoreModel) -> dict:
         "source_name": Path(model.source_path).name if model.source_path else None,
         "pages": [p.number for p in model.pages],
         "measure_count": sum(m.length for m in first.measures) if first else 0,
+        # Conducteur (lu ou assemblé) : ses instruments ; partition tirée d'autres.
+        "instruments": [g[0].name for g in conductor.instrument_groups(model)]
+        if conductor.is_conductor(model) else [],
+        "derived": model.derived,
     }
+
+
+# --- Conducteurs --------------------------------------------------------------------------
+
+
+def extract_parts(conn: sqlite3.Connection, score_id: int) -> list[dict]:
+    """Une partition par instrument du conducteur `score_id`, enregistrées comme de
+    nouvelles partitions (le conducteur ne change pas). Renvoie leurs résumés."""
+    model = load_model(conn, score_id)
+    if model is None or not conductor.is_conductor(model):
+        return []
+    result = []
+    for part in conductor.extract_parts(model):
+        part.derived_from = [score_id]
+        new_id = _register_derived(conn, score_id, part)
+        result.append(summary(new_id, part))
+    return result
+
+
+def assemble_conductor(conn: sqlite3.Connection, score_ids: list[int]) -> dict | None:
+    """Conducteur fait des partitions `score_ids` (une partie par instrument), enregistré
+    comme une nouvelle partition. Renvoie son résumé (None si une partition manque)."""
+    models = [(score_id, load_model(conn, score_id)) for score_id in score_ids]
+    if len(models) < 2 or any(model is None for _, model in models):
+        return None
+    result = conductor.assemble(models)
+    new_id = _register_derived(conn, score_ids[0], result)
+    return summary(new_id, result)
+
+
+def piece_scores(conn: sqlite3.Connection, score_id: int) -> list[dict]:
+    """Partitions du même morceau (même titre), pour choisir celles d'un conducteur."""
+    result = []
+    for other_id in piece_of(conn, score_id):
+        model = load_model(conn, other_id)
+        if model is not None:
+            result.append(summary(other_id, model))
+    return result
+
+
+def _register_derived(conn: sqlite3.Connection, source_id: int, model: ScoreModel) -> int:
+    """Enregistre une partition tirée d'une autre (même fichier d'origine)."""
+    row = conn.execute("SELECT source_path, source_kind, page_count FROM scores WHERE id = ?",
+                       (source_id,)).fetchone()
+    with conn:
+        cursor = conn.execute(
+            "INSERT INTO scores (title, part_name, source_path, source_kind, page_count) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (model.title, model.instrument, row[0], row[1], row[2]))
+    save_model(conn, cursor.lastrowid, model)
+    return cursor.lastrowid
 
 
 def _folder_name(source: Path) -> str:

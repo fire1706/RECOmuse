@@ -188,8 +188,9 @@ class QuestionSession:
         refs, owners = [], []
         for other_id in library.piece_of(self._conn, score_id):
             other = model if other_id == score_id else load_model(self._conn, other_id)
-            if other is not model and other is not None and other.transposed_from is not None:
-                continue   # copie transposée d'une autre partie : elle la doublerait
+            if other is not model and other is not None and (
+                    other.transposed_from is not None or other.derived is not None):
+                continue   # copie (transposée, extraite, assemblée) : elle doublerait l'autre
             for ref in part_refs([other] if other else []):
                 refs.append(ref)
                 owners.append(other_id)

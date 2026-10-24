@@ -208,3 +208,27 @@ def test_grouped_parts_are_split_and_compared(tmp_path, monkeypatch, prefix):
     found = [(i.part_id, i.code, i.action.get("set_multirest")) for i in report.issues]
     assert found == expected
     assert all(i.details["usual_length"] == usual for i in report.issues)
+
+
+def test_conductor_of_blues_on_the_hill(tmp_path, monkeypatch, conn):
+    """Tâche 14 : le conducteur est lu avec le nom de chaque instrument, et ses parties
+    extraites ont la même longueur que les parties séparées du même morceau."""
+    from recomuse import library
+    from recomuse.recognition import tools
+
+    matches = [p for p in corpus_pdfs() if p.name.startswith("blues_on_the_hill_score")]
+    if not matches:
+        pytest.skip("conducteur absent du corpus")
+    status = tools.check_tools()
+    monkeypatch.setattr(tools, "check_tools", lambda: tools.ToolsStatus(
+        audiveris=None, tesseract=None, tessdata=None, languages=[],
+        missing_languages=status.missing_languages))
+    [score] = library.open_file(conn, matches[0], work_root=tmp_path / "work")
+    assert score["instruments"][:5] == ["Alto Sax 1", "Alto Sax 2", "Tenor Sax 1",
+                                        "Tenor Sax 2", "Baritone Sax"]
+    assert score["instruments"][-3:] == ["Piano", "Bass", "Drums"]
+    parts = library.extract_parts(conn, score["score_id"])
+    assert len(parts) == 17                          # 18 portées, le piano en a deux
+    assert {p["measure_count"] for p in parts} == {156}
+    piano = next(p for p in parts if p["instrument"] == "Piano")
+    assert piano["derived"] == "extracted"
