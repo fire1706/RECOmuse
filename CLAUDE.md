@@ -61,7 +61,9 @@ Cahier des charges complet : `docs/cahier-des-charges.md` (à lire avant toute t
 8. `instruments` : table d'instruments modifiable (fichier de données), transposition, changement de clé.
 9. `export` : MusicXML, MIDI à la hauteur réelle, MuseScore.
 
-L'interface (`ui/`) montre le scan à gauche, le rendu Verovio à droite, et les questions au centre.
+L'interface (`ui/`) suit l'allure de MuseScore 4 (thème sombre gris, couleurs en variables dans
+`App.css`) : onglet Accueil (partitions en cartes) et onglet Partition (barre d'outils, panneaux
+repliables « Questions » et « Partition d'origine », puis le rendu Verovio sur fond gris).
 
 ## Résultats du test de faisabilité (tâche 0)
 Audiveris 5.11 testé sur deux partitions :

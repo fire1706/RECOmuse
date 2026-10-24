@@ -10,16 +10,51 @@ import { fakeApi, fakeInfo, questionsState, restQuestion } from './testFakes'
 describe('App', () => {
   afterEach(async () => {
     await act(() => i18n.changeLanguage('fr'))
+    window.localStorage.clear()
   })
 
-  it('affiche les trois zones de travail', async () => {
+  it("s'ouvre sur l'accueil, puis montre les trois zones de travail dans l'onglet Partition", async () => {
     await act(() => i18n.changeLanguage('fr'))
     render(<App connect={async () => fakeApi()} />)
+    expect(screen.getByRole('tab', { name: 'Accueil' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('heading', { name: 'Mes partitions' })).toBeInTheDocument()
+    // Laisse la connexion simulée se terminer.
+    expect(await screen.findByText(/Aucune partition lue pour l'instant/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Partition' }))
     expect(screen.getByRole('heading', { name: "Partition d'origine" })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Questions' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Partition reconnue' })).toBeInTheDocument()
-    // Laisse la connexion simulée se terminer avant la fin du test.
+    expect(screen.getByRole('toolbar', { name: 'Outils' })).toBeInTheDocument()
+  })
+
+  it("montre les partitions lues en cartes, et ouvre celle qu'on choisit", async () => {
+    const part = (id: number, instrument: string) => ({
+      score_id: id, title: 'Marche', instrument, source_name: 'marche.pdf', pages: [1], measure_count: 40, instruments: [], derived: null,
+    })
+    const api = fakeApi({ list_scores: async () => [part(1, 'Flûte'), part(2, 'Cornet')] })
+    render(<App connect={async () => api} />)
+    const piece = await screen.findByRole('region', { name: 'Marche' })
+    fireEvent.click(within(piece).getByRole('button', { name: /Cornet/ }))
+    expect(screen.getByRole('tab', { name: 'Partition' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('combobox', { name: 'Partition' })).toHaveValue('2')
+  })
+
+  it('replie un panneau et le retient', async () => {
+    const { unmount } = render(<App connect={async () => fakeApi()} />)
     await screen.findByText(/Moteur prêt/)
+    fireEvent.click(screen.getByRole('tab', { name: 'Partition' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Replier le panneau « Questions »' }))
+    expect(screen.queryByText(/Ouvrez une partition, ou choisissez-en une/)).not.toBeInTheDocument()
+    unmount()
+
+    render(<App connect={async () => fakeApi()} />)
+    await screen.findByText(/Moteur prêt/)
+    fireEvent.click(screen.getByRole('tab', { name: 'Partition' }))
+    const show = screen.getByRole('button', { name: 'Afficher le panneau « Questions »' })
+    expect(show).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(show)
+    expect(screen.getByText(/Ouvrez une partition, ou choisissez-en une/)).toBeInTheDocument()
   })
 
   it('affiche les informations du moteur une fois connecté', async () => {
@@ -54,9 +89,10 @@ describe('App', () => {
     render(<App connect={async () => fakeApi()} />)
     await screen.findByText(/Moteur prêt/)
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'en' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Langue' }), { target: { value: 'en' } })
 
-    expect(await screen.findByRole('heading', { name: 'Original score' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'My scores' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Score' })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('3 corrections remembered')
   })
 

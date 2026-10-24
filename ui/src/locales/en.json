@@ -17,7 +17,9 @@
     "questions": "Questions",
     "questionsEmpty": "Open a score, or pick one from the list.",
     "result": "Recognized score",
-    "resultEmpty": "The result will appear here."
+    "resultEmpty": "The result will appear here.",
+    "hide": "Collapse the “{{name}}” panel",
+    "show": "Show the “{{name}}” panel"
   },
   "language": {
     "label": "Language"
@@ -458,5 +460,20 @@
       "assembled": "assembled conductor score"
     },
     "noPages": "Conductor score assembled from several files: it has no original pages. Open one of the parts to see its scan."
+  },
+  "tabs": {
+    "label": "Tabs",
+    "home": "Home",
+    "score": "Score"
+  },
+  "toolbar": {
+    "label": "Tools"
+  },
+  "home": {
+    "title": "My scores",
+    "formats": "PDF or image",
+    "empty": "No score read yet: open a PDF or an image to start.",
+    "measures_one": "{{count}} bar",
+    "measures_other": "{{count}} bars"
   }
 }

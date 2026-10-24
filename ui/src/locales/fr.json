@@ -17,7 +17,9 @@
     "questions": "Questions",
     "questionsEmpty": "Ouvrez une partition, ou choisissez-en une dans la liste.",
     "result": "Partition reconnue",
-    "resultEmpty": "Le résultat s'affichera ici."
+    "resultEmpty": "Le résultat s'affichera ici.",
+    "hide": "Replier le panneau « {{name}} »",
+    "show": "Afficher le panneau « {{name}} »"
   },
   "language": {
     "label": "Langue"
@@ -458,5 +460,20 @@
       "assembled": "conducteur assemblé"
     },
     "noPages": "Conducteur assemblé à partir de plusieurs fichiers : il n'a pas de pages d'origine. Ouvrez une des parties pour voir son scan."
+  },
+  "tabs": {
+    "label": "Onglets",
+    "home": "Accueil",
+    "score": "Partition"
+  },
+  "toolbar": {
+    "label": "Outils"
+  },
+  "home": {
+    "title": "Mes partitions",
+    "formats": "PDF ou image",
+    "empty": "Aucune partition lue pour l'instant : ouvrez un PDF ou une image pour commencer.",
+    "measures_one": "{{count}} mesure",
+    "measures_other": "{{count}} mesures"
   }
 }

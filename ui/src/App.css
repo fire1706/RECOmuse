@@ -1,9 +1,36 @@
-/* Mise en page de l'écran principal : en-tête, trois colonnes, barre d'état. */
+/* Apparence de RECOmuse, inspirée de MuseScore 4 (thème sombre) :
+   - barre du haut avec les onglets Accueil / Partition ;
+   - barre d'outils (icônes et textes) sous les onglets, dans l'onglet Partition ;
+   - panneaux repliables (questions, scan) autour de la partition reconnue, posée comme
+     une feuille blanche sur un fond gris ;
+   - barre d'état en bas.
+   Toutes les couleurs sont des variables (--...) : les changer ici change tout l'écran. */
 
 :root {
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-  color: #1f2328;
-  background: #f6f7f9;
+  /* Couleurs du thème sombre de MuseScore 4. */
+  --bg-app: #2d2d30;          /* fond des panneaux */
+  --bg-raised: #363638;       /* cartes, boîtes de dialogue */
+  --bg-bar: #262628;          /* barres du haut et du bas */
+  --bg-canvas: #1f1f21;       /* fond gris foncé derrière les feuilles */
+  --bg-field: #242427;        /* champs de saisie, listes */
+  --bg-button: #48484c;
+  --bg-button-hover: #57575c;
+  --border: #1a1a1c;
+  --border-soft: #46464a;
+  --text: #ebebeb;
+  --text-muted: #a9a9ad;
+  --accent: #2093fe;          /* bleu de MuseScore : actions et éléments choisis */
+  --accent-hover: #4aa8ff;
+  --accent-soft: rgb(32 147 254 / 18%);
+  --danger: #ff6b6b;
+  --selection: #f08c3a;       /* mesure choisie (orange, comme avant) */
+  --paper: #ffffff;           /* feuilles de musique */
+
+  font-family: 'Segoe UI', system-ui, Roboto, sans-serif;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg-canvas);
+  color-scheme: dark;
 }
 
 body {
@@ -16,130 +43,426 @@ body {
   height: 100vh;
 }
 
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 1.25rem;
-  background: #1d3557;
+/* --- Éléments de base : boutons, listes, champs --------------------------------------- */
+
+button,
+select,
+input {
+  font: inherit;
+  color: var(--text);
+}
+
+button {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-button);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--bg-button-hover);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+select,
+input[type='text'],
+input[type='number'],
+input:not([type]) {
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  background: var(--bg-field);
+}
+
+.primary {
+  border-color: var(--accent);
+  background: var(--accent);
   color: #fff;
 }
 
-.app-header h1 {
-  margin: 0;
-  font-size: 1.4rem;
+.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
-.tagline {
-  margin: 0.15rem 0 0;
-  opacity: 0.8;
-  font-size: 0.9rem;
+.icon {
+  flex: none;
+}
+
+.empty {
+  color: var(--text-muted);
+}
+
+.error,
+.danger {
+  color: var(--danger);
+}
+
+/* --- Barre du haut : nom du logiciel, onglets, langue ---------------------------------- */
+
+.topbar {
+  display: flex;
+  align-items: stretch;
+  gap: 1.5rem;
+  padding: 0 1rem;
+  background: var(--bg-bar);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.brand .icon {
+  color: var(--accent);
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+/* Onglet : texte simple, souligné en bleu quand il est choisi (comme MuseScore 4). */
+.tab {
+  padding: 0.7rem 1rem 0.6rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--text-muted);
+}
+
+.tab:hover:not(:disabled) {
+  background: none;
+  color: var(--text);
+}
+
+.tab[aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--text);
 }
 
 .language-picker {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  margin-left: auto;
   font-size: 0.9rem;
+  color: var(--text-muted);
 }
 
-/* Trois colonnes : scan (gauche), questions (centre, plus large : l'extrait de la
-   partition doit être lisible), résultat (droite). */
-.panels {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1.3fr 1fr 1.3fr;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  min-height: 0;
-}
+/* --- Barre d'outils de l'onglet Partition ---------------------------------------------- */
 
-.panel {
-  background: #fff;
-  border: 1px solid #d0d7de;
-  border-radius: 6px;
-  padding: 1rem;
-  overflow: auto;
-}
-
-.panel h2 {
-  margin-top: 0;
-  font-size: 1.05rem;
-}
-
-.panel-questions {
-  background: #fffdf5;
-}
-
-.empty {
-  color: #656d76;
-}
-
-.status-bar {
-  padding: 0.4rem 1.25rem;
-  font-size: 0.85rem;
-  color: #656d76;
-  border-top: 1px solid #d0d7de;
-  background: #fff;
-}
-
-/* Barre d'outils de l'en-tête : ouvrir, choisir la partition, langue. */
 .toolbar {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--bg-app);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Bouton d'outil : icône et texte, sans cadre tant qu'on ne le survole pas. */
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-color: transparent;
+  background: none;
+}
+
+.tool:hover:not(:disabled) {
+  border-color: var(--border-soft);
+}
+
+.toolbar-separator {
+  width: 1px;
+  align-self: stretch;
+  margin: 0.2rem 0.4rem;
+  background: var(--border-soft);
 }
 
 .score-picker {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  margin-left: auto;
   font-size: 0.9rem;
+  color: var(--text-muted);
 }
 
 .score-picker select {
-  max-width: 22rem;
+  max-width: 24rem;
 }
 
-button {
-  font: inherit;
-  cursor: pointer;
+/* --- Onglet Accueil : partitions en cartes --------------------------------------------- */
+
+.home {
+  flex: 1;
+  overflow: auto;
+  padding: 2rem 2.5rem;
+  background: var(--bg-app);
 }
 
-button:disabled {
-  cursor: default;
-  opacity: 0.6;
+.home h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 600;
 }
 
-/* Barre de progression de la lecture d'un fichier. */
+.home-tagline {
+  margin: 0 0 1.5rem;
+  color: var(--text-muted);
+}
+
+.home-piece {
+  margin: 1.75rem 0 0;
+}
+
+.home-piece h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 1rem;
+}
+
+/* Carte d'une partie : une « feuille » stylisée, puis son nom. */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  text-align: left;
+}
+
+.card:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-raised);
+}
+
+.card-sheet {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 8rem;
+  border-radius: 3px;
+  background: var(--paper);
+  /* Lignes de portées dessinées en fond. */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 9px,
+    #c9c9c9 9px 10px
+  );
+  background-size: 80% 50px;
+  background-position: center 18px;
+  background-repeat: repeat-y;
+  color: #6b6b6b;
+}
+
+.card-new .card-sheet {
+  background: var(--bg-field);
+  border: 2px dashed var(--border-soft);
+  color: var(--accent);
+}
+
+.card-name {
+  font-weight: 600;
+}
+
+.card-detail {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.home .notices {
+  max-width: 40rem;
+}
+
+/* --- Onglet Partition : panneaux repliables et partition --------------------------------- */
+
+.workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  background: var(--bg-canvas);
+}
+
+/* Panneau latéral (questions, scan), avec son en-tête et son bouton « replier ». */
+.dock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg-app);
+  border-right: 1px solid var(--border);
+}
+
+.dock-questions {
+  flex: 0 0 24rem;
+}
+
+.dock-scan {
+  flex: 1 1 0;
+  background: var(--bg-canvas);
+}
+
+.dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem 0.35rem 0.9rem;
+  background: var(--bg-app);
+  border-bottom: 1px solid var(--border);
+}
+
+.dock-header h2 {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.dock-toggle {
+  display: inline-flex;
+  padding: 0.2rem;
+  border-color: transparent;
+  background: none;
+  color: var(--text-muted);
+}
+
+.dock-body {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem;
+}
+
+/* Panneau replié : une fine bande verticale avec son nom, pour le rouvrir. */
+.dock.collapsed {
+  flex: 0 0 2.5rem;
+}
+
+.dock.collapsed .dock-header {
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 0.5rem 0;
+  border-bottom: none;
+}
+
+.dock.collapsed h2 {
+  writing-mode: vertical-rl;
+}
+
+/* Replié : le bouton pour rouvrir passe au-dessus du nom. */
+.dock.collapsed .dock-toggle {
+  order: -1;
+  margin-bottom: 0.5rem;
+}
+
+/* Zone de la partition reconnue : la feuille blanche au milieu du fond gris. */
+.canvas {
+  flex: 1.2 1 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.canvas .dock-header {
+  border-left: none;
+}
+
+.canvas-body {
+  flex: 1;
+  overflow: auto;
+  padding: 1.25rem;
+}
+
+/* Feuille de musique (scan ou rendu) : blanche, avec une ombre, texte foncé. */
+.sheet {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1rem;
+  border-radius: 2px;
+  background: var(--paper);
+  color: #1f2328;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 45%);
+}
+
+.canvas-body > .empty,
+.dock-scan .dock-body > .empty {
+  margin: 3rem auto;
+  text-align: center;
+}
+
+.status-bar {
+  padding: 0.3rem 1rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--bg-bar);
+  border-top: 1px solid var(--border);
+}
+
+/* --- Barre de progression de la lecture d'un fichier ------------------------------------- */
+
 .reading {
-  margin: 0 0 1rem;
-  padding: 0.75rem 1rem;
-  border: 1px solid #d0d7de;
+  max-width: 34rem;
+  margin: 3rem auto;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--bg-raised);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 35%);
 }
 
 .reading-stage {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.75rem;
   font-weight: 600;
 }
 
 .reading-page {
   font-weight: normal;
-  color: #57606a;
+  color: var(--text-muted);
 }
 
 .reading-bar {
-  height: 10px;
-  border-radius: 5px;
-  background: #e6e9ee;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-field);
   overflow: hidden;
 }
 
 .reading-bar-fill {
   height: 100%;
-  background: #1d72d8;
+  background: var(--accent);
   transition: width 0.6s ease;
 }
 
@@ -147,31 +470,28 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
   font-size: 0.9rem;
-  color: #57606a;
+  color: var(--text-muted);
 }
 
-.error {
-  color: #b42318;
-}
-
-/* --- Questions ------------------------------------------------------------------ */
+/* --- Questions -------------------------------------------------------------------------- */
 
 .question-progress,
 .question-where {
   margin: 0 0 0.4rem;
   font-size: 0.85rem;
-  color: #656d76;
+  color: var(--text-muted);
 }
 
+/* L'extrait du scan reste sur fond blanc, pour être lisible. */
 .question-image {
   display: block;
   max-width: 100%;
   margin: 0.5rem 0;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background: #fff;
+  background: var(--paper);
 }
 
 .question-text {
@@ -181,7 +501,7 @@ button:disabled {
 
 .question-note {
   font-size: 0.9rem;
-  color: #656d76;
+  color: var(--text-muted);
 }
 
 /* Les choix : de grands boutons, faciles à viser. */
@@ -196,14 +516,14 @@ button:disabled {
   padding: 0.7rem 1rem;
   font-size: 1.05rem;
   text-align: left;
-  border: 1px solid #1d3557;
+  border: 1px solid var(--border-soft);
   border-radius: 6px;
-  background: #fff;
-  color: #1d3557;
+  background: var(--bg-raised);
 }
 
 .choice:hover:not(:disabled) {
-  background: #e8eef7;
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .choice-input {
@@ -221,8 +541,6 @@ button:disabled {
 
 .choice-input input {
   width: 5rem;
-  font: inherit;
-  padding: 0.3rem;
 }
 
 .question-actions {
@@ -234,23 +552,42 @@ button:disabled {
   padding: 0;
   border: none;
   background: none;
-  color: #1d3557;
+  color: var(--accent);
   text-decoration: underline;
 }
 
-/* --- Vue côte à côte -------------------------------------------------------------- */
+.link-button:hover:not(:disabled) {
+  background: none;
+  color: var(--accent-hover);
+}
+
+.checks {
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.checks ul {
+  padding-left: 1.2rem;
+}
+
+/* --- Vue côte à côte ---------------------------------------------------------------------- */
 
 .page-nav {
   display: flex;
   gap: 0.75rem;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
   font-size: 0.9rem;
+  color: var(--text-muted);
 }
 
 /* La page et ses mesures : les cadres sont placés en pourcentages de l'image. */
 .scan-page {
   position: relative;
+  max-width: 60rem;
+  margin: 0 auto;
+  background: var(--paper);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 45%);
 }
 
 .scan-page img {
@@ -263,17 +600,18 @@ button:disabled {
   position: absolute;
   padding: 0;
   border: 1px solid transparent;
+  border-radius: 0;
   background: transparent;
 }
 
-.measure-box:hover {
-  border-color: #457b9d;
-  background: rgb(69 123 157 / 8%);
+.measure-box:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: rgb(32 147 254 / 10%);
 }
 
 .measure-box.selected {
-  border: 2px solid #e8590c;
-  background: rgb(232 89 12 / 10%);
+  border: 2px solid var(--selection);
+  background: rgb(240 140 58 / 14%);
 }
 
 .score-view svg {
@@ -287,32 +625,33 @@ button:disabled {
 
 /* Mesure choisie : dessinée en orange. */
 .score-view g.measure.selected {
-  fill: #e8590c;
-  stroke: #e8590c;
-  color: #e8590c;
+  fill: var(--selection);
+  stroke: var(--selection);
+  color: var(--selection);
 }
 
-.checks {
-  margin-top: 1.5rem;
-  font-size: 0.9rem;
+/* Symbole choisi dans le rendu : en bleu (la mesure choisie est en orange). */
+.score-view .selected-symbol,
+.score-view g.measure.selected .selected-symbol {
+  fill: var(--accent);
+  stroke: var(--accent);
+  color: var(--accent);
 }
 
-.checks ul {
-  padding-left: 1.2rem;
-}
-
-/* --- Édition manuelle --------------------------------------------------------------- */
+/* --- Édition manuelle (au-dessus de la partition, comme le panneau Propriétés) ------------ */
 
 .measure-editor {
   position: sticky;
-  top: -1rem;
+  top: -1.25rem;
   z-index: 1;
-  margin: -0.25rem 0 0.75rem;
-  padding: 0.6rem;
-  border: 1px solid #d0d7de;
+  max-width: 60rem;
+  margin: -0.25rem auto 1rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #f6f8fa;
+  background: var(--bg-raised);
   font-size: 0.9rem;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 35%);
 }
 
 .editor-header,
@@ -345,10 +684,10 @@ button:disabled {
 }
 
 .symbol-chip {
-  padding: 0.2rem 0.5rem;
-  border: 1px solid #8c959f;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border-soft);
   border-radius: 999px;
-  background: #fff;
+  background: var(--bg-field);
 }
 
 .symbol-chip.doubtful {
@@ -357,28 +696,16 @@ button:disabled {
 
 .symbol-chip.selected,
 .symbol-editor button[aria-pressed='true'] {
-  border-color: #1971c2;
-  background: #d0ebff;
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .symbol-editor {
   padding-top: 0.4rem;
-  border-top: 1px solid #d0d7de;
+  border-top: 1px solid var(--border-soft);
 }
 
-.danger {
-  color: #b42318;
-}
-
-/* Symbole choisi dans le rendu : en bleu (la mesure choisie est en orange). */
-.score-view .selected-symbol,
-.score-view g.measure.selected .selected-symbol {
-  fill: #1971c2;
-  stroke: #1971c2;
-  color: #1971c2;
-}
-
-/* --- Fenêtre de transposition ------------------------------------------------------- */
+/* --- Boîtes de dialogue (transposition, export, conducteur, packs, règles) ---------------- */
 
 .dialog-backdrop {
   position: fixed;
@@ -387,21 +714,24 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgb(0 0 0 / 35%);
+  background: rgb(0 0 0 / 55%);
 }
 
 .dialog {
   width: min(40rem, 92vw);
   max-height: 90vh;
   overflow: auto;
-  padding: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 10px 40px rgb(0 0 0 / 25%);
+  background: var(--bg-raised);
+  box-shadow: 0 12px 48px rgb(0 0 0 / 55%);
 }
 
 .dialog h2 {
   margin-top: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
 }
 
 .dialog fieldset {
@@ -409,8 +739,12 @@ button:disabled {
   flex-direction: column;
   gap: 0.5rem;
   margin: 0 0 1rem;
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border-soft);
   border-radius: 6px;
+}
+
+.dialog legend {
+  color: var(--text-muted);
 }
 
 .dialog fieldset > label {
@@ -421,12 +755,17 @@ button:disabled {
 
 .radio input {
   margin: 0;
+  accent-color: var(--accent);
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent);
 }
 
 .transpose-preview {
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
-  background: #f6f8fa;
+  background: var(--bg-field);
 }
 
 .dialog-actions {
@@ -436,15 +775,7 @@ button:disabled {
   margin-top: 1rem;
 }
 
-.primary {
-  padding: 0.4rem 1rem;
-  border: 1px solid #1d3557;
-  border-radius: 6px;
-  background: #1d3557;
-  color: #fff;
-}
-
-/* --- Règles apprises ---------------------------------------------------------------- */
+/* --- Règles apprises ---------------------------------------------------------------------- */
 
 .rules {
   padding: 0;
@@ -453,7 +784,7 @@ button:disabled {
 
 .rules li {
   padding: 0.5rem 0;
-  border-bottom: 1px solid #eaeef2;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .rules li.disabled {

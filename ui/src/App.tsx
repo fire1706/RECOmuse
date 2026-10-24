@@ -1,10 +1,10 @@
-// Écran principal de RECOmuse.
-//
-// Disposition prévue par le cahier des charges :
-//   à gauche le scan d'origine, au centre les questions, à droite le rendu Verovio.
-// Tâche 8 : ouverture d'une partition et questions guidées (zone du centre).
-// Tâche 9 : vue côte à côte. Une mesure choisie (clic sur le scan, sur le rendu, question
-// en cours ou passage à vérifier) est montrée des deux côtés.
+// Écran principal de RECOmuse, à la manière de MuseScore 4 :
+// - onglet Accueil : les partitions déjà lues, en cartes groupées par morceau, et une carte
+//   pour en ouvrir une nouvelle ;
+// - onglet Partition : barre d'outils, puis les questions (panneau de gauche, repliable),
+//   le scan d'origine (repliable) et la partition reconnue, côte à côte. Une mesure choisie
+//   (clic sur le scan, sur le rendu, question en cours ou passage à vérifier) est montrée
+//   des deux côtés.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -17,7 +17,17 @@ import {
   type ScoreSummary,
   waitForBridge,
 } from './bridge'
+import Dock from './Dock'
 import { SUPPORTED_LANGUAGES } from './i18n'
+import {
+  ConductorIcon,
+  ExportIcon,
+  NoteIcon,
+  OpenIcon,
+  PacksIcon,
+  RulesIcon,
+  TransposeIcon,
+} from './Icons'
 import MeasureEditor from './MeasureEditor'
 import PacksDialog from './PacksDialog'
 import QuestionPanel from './QuestionPanel'
@@ -49,6 +59,36 @@ const READING_START: ReadingState = {
   cancelling: false,
 }
 
+/** Onglets de la barre du haut. */
+type Tab = 'home' | 'score'
+
+/** Panneaux repliables de l'onglet Partition : ouverts ou repliés. */
+interface DockState {
+  questions: boolean
+  scan: boolean
+}
+
+// Les panneaux repliés sont retenus d'une fois sur l'autre (dans le navigateur intégré).
+const DOCKS_KEY = 'recomuse.docks'
+const DOCKS_DEFAULT: DockState = { questions: true, scan: true }
+
+function loadDocks(): DockState {
+  try {
+    const saved = window.localStorage.getItem(DOCKS_KEY)
+    return saved ? { ...DOCKS_DEFAULT, ...JSON.parse(saved) } : DOCKS_DEFAULT
+  } catch {
+    return DOCKS_DEFAULT
+  }
+}
+
+function saveDocks(docks: DockState) {
+  try {
+    window.localStorage.setItem(DOCKS_KEY, JSON.stringify(docks))
+  } catch {
+    // Pas de mémoire disponible : les panneaux reviendront ouverts, sans plus.
+  }
+}
+
 interface AppProps {
   /** Permet aux tests de fournir un faux pont ; par défaut, le vrai pont pywebview. */
   connect?: () => Promise<PythonApi | null>
@@ -77,6 +117,8 @@ export function groupByPiece(scores: ScoreSummary[], untitled: string): [string,
 export default function App({ connect = waitForBridge }: AppProps) {
   const { t, i18n } = useTranslation()
   const [engine, setEngine] = useState<EngineState>({ kind: 'connecting' })
+  const [tab, setTab] = useState<Tab>('home')
+  const [docks, setDocks] = useState<DockState>(loadDocks)
   const [scores, setScores] = useState<ScoreSummary[]>([])
   const [scoreId, setScoreId] = useState<number | null>(null)
   // Lecture en cours (étape, page, part faite...) ; null : aucune lecture.
@@ -134,8 +176,17 @@ export default function App({ connect = waitForBridge }: AppProps) {
     setScores(await engine.api.list_scores())
   }, [engine])
 
-  /** Choisit une partition : sa première page, aucune mesure choisie. */
+  /** Replie ou rouvre un panneau, et le retient. */
+  function toggleDock(name: keyof DockState) {
+    const next = { ...docks, [name]: !docks[name] }
+    setDocks(next)
+    saveDocks(next)
+  }
+
+  /** Choisit une partition (l'onglet Partition s'ouvre) : sa première page, aucune
+   *  mesure choisie. */
   const chooseScore = useCallback((id: number | null, known: ScoreSummary[]) => {
+    if (id !== null) setTab('score')
     setScoreId(id)
     setSelected(null)
     setSymbol(null)
@@ -178,6 +229,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
     setOpenError(null)
     setOpenedParts(null)
     setRemembered([])
+    setTab('score')
     setReading(READING_START)
     poll.current = window.setInterval(async () => {
       const state = await api.get_progress()
@@ -205,143 +257,213 @@ export default function App({ connect = waitForBridge }: AppProps) {
 
   const connected = engine.kind === 'connected'
   const current = scores.find((s) => s.score_id === scoreId) ?? null
+  const busy = !connected || reading !== null
+
+  /** Messages après une lecture : parties trouvées, corrections reprises, erreur. */
+  const notices = (
+    <div className="notices">
+      {openedParts !== null && openedParts > 1 && (
+        <p className="question-note">{t('open.parts', { count: openedParts })}</p>
+      )}
+      {remembered.map((score) => (
+        <p key={score.score_id} className="question-note">
+          {t(score.memory!.from_pack ? 'memory.fromPack' : 'memory.replayed', {
+            name: score.instrument ?? score.title ?? '',
+            author: score.memory!.author ?? t('packs.anonymous'),
+            date: new Date(score.memory!.read_at).toLocaleDateString(i18n.resolvedLanguage),
+            corrections: t('memory.corrections', { count: score.memory!.applied }),
+            answers: t('memory.answers', { count: score.memory!.answers }),
+          })}
+          {score.memory!.skipped > 0 && ` ${t('memory.skipped', { count: score.memory!.skipped })}`}
+        </p>
+      ))}
+      {openError && (
+        // Une lecture annulée n'est pas une erreur : simple remarque.
+        <p className={openError === 'cancelled' ? 'question-note' : 'error'}>
+          {t(`errors.${openError}`, { defaultValue: t('errors.unexpected') })}
+        </p>
+      )}
+    </div>
+  )
 
   return (
     <div className="app">
-      <header className="app-header">
-        <div>
-          <h1>{t('app.title')}</h1>
-          <p className="tagline">{t('app.tagline')}</p>
-        </div>
-        <div className="toolbar">
-          <button type="button" onClick={openScore} disabled={!connected || reading !== null}>
-            {t('open.button')}
-          </button>
-          {scoreId !== null && (
-            <button type="button" onClick={() => setTransposing(true)} disabled={!connected || reading !== null}>
-              {t('transpose.button')}
+      <header className="topbar">
+        <h1 className="brand">
+          <NoteIcon />
+          {t('app.title')}
+        </h1>
+        <nav className="tabs" role="tablist" aria-label={t('tabs.label')}>
+          {(['home', 'score'] as const).map((name) => (
+            <button key={name} type="button" role="tab" className="tab"
+              aria-selected={tab === name} onClick={() => setTab(name)}>
+              {t(`tabs.${name}`)}
             </button>
-          )}
-          {scoreId !== null && (
-            <button type="button" onClick={() => setShowConductor(true)} disabled={!connected || reading !== null}>
-              {t('conductor.button')}
-            </button>
-          )}
-          {scoreId !== null && (
-            <button type="button" onClick={() => setExporting(true)} disabled={!connected || reading !== null}>
-              {t('export.button')}
-            </button>
-          )}
-          {scores.length > 0 && (
-            <label className="score-picker">
-              {t('scores.label')}
-              <select value={scoreId ?? ''} disabled={reading !== null}
-                onChange={(e) => chooseScore(e.target.value ? Number(e.target.value) : null, scores)}>
-                <option value="">{t('scores.choose')}</option>
-                {groupByPiece(scores, t('scores.unknownPiece')).map(([title, parts]) => (
-                  <optgroup key={title} label={title}>
-                    {parts.map((score) => (
-                      <option key={score.score_id} value={score.score_id}>
-                        {t('scores.item', {
-                          name: scoreLabel(score, t('scores.untitled')),
-                          count: score.measure_count,
-                        })}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
-          )}
-          {connected && (
-            <button type="button" onClick={() => setShowRules(true)}>
-              {t('rules.button')}
-            </button>
-          )}
-          {connected && (
-            <button type="button" onClick={() => setShowPacks(true)}>
-              {t('packs.button')}
-            </button>
-          )}
-          <label className="language-picker">
-            {t('language.label')}
-            <select value={i18n.resolvedLanguage} onChange={(e) => i18n.changeLanguage(e.target.value)}>
-              {SUPPORTED_LANGUAGES.map((lang) => (
-                <option key={lang} value={lang}>
-                  {lang.toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+          ))}
+        </nav>
+        <label className="language-picker">
+          {t('language.label')}
+          <select value={i18n.resolvedLanguage} onChange={(e) => i18n.changeLanguage(e.target.value)}>
+            {SUPPORTED_LANGUAGES.map((lang) => (
+              <option key={lang} value={lang}>
+                {lang.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </label>
       </header>
 
-      <main className="panels">
-        <section className="panel" aria-labelledby="panel-scan">
-          <h2 id="panel-scan">{t('panels.scan')}</h2>
-          {engine.kind === 'connected' && scoreId !== null && page !== null && reading === null ? (
-            <ScanView api={engine.api} scoreId={scoreId} page={page} version={version}
-              selectedMeasure={selected} onPage={setPage} onSelect={focusMeasure} />
-          ) : (
-            <p className="empty">
-              {current?.derived === 'assembled' ? t('conductor.noPages') : t('panels.scanEmpty')}
-            </p>
-          )}
-        </section>
-        <section className="panel panel-questions" aria-labelledby="panel-questions">
-          <h2 id="panel-questions">{t('panels.questions')}</h2>
-          {reading !== null && engine.kind === 'connected' && (
-            <ReadingProgress
-              state={reading}
-              onCancel={() => {
-                setReading({ ...reading, cancelling: true })
-                void engine.api.cancel_reading()
-              }}
-            />
-          )}
-          {openedParts !== null && openedParts > 1 && (
-            <p className="question-note">{t('open.parts', { count: openedParts })}</p>
-          )}
-          {remembered.map((score) => (
-            <p key={score.score_id} className="question-note">
-              {t(score.memory!.from_pack ? 'memory.fromPack' : 'memory.replayed', {
-                name: score.instrument ?? score.title ?? '',
-                author: score.memory!.author ?? t('packs.anonymous'),
-                date: new Date(score.memory!.read_at).toLocaleDateString(i18n.resolvedLanguage),
-                corrections: t('memory.corrections', { count: score.memory!.applied }),
-                answers: t('memory.answers', { count: score.memory!.answers }),
-              })}
-              {score.memory!.skipped > 0 && ` ${t('memory.skipped', { count: score.memory!.skipped })}`}
-            </p>
+      {tab === 'home' && (
+        <main className="home">
+          <h2>{t('home.title')}</h2>
+          <p className="home-tagline">{t('app.tagline')}</p>
+          {notices}
+          <div className="cards">
+            <button type="button" className="card card-new" onClick={openScore} disabled={busy}
+              aria-label={t('open.button')}>
+              <span className="card-sheet">
+                <OpenIcon />
+              </span>
+              <span className="card-name">{t('open.button')}</span>
+              <span className="card-detail">{t('home.formats')}</span>
+            </button>
+          </div>
+          {scores.length === 0 && connected && <p className="empty">{t('home.empty')}</p>}
+          {groupByPiece(scores, t('scores.unknownPiece')).map(([title, parts]) => (
+            <section key={title} className="home-piece" aria-label={title}>
+              <h3>{title}</h3>
+              <div className="cards">
+                {parts.map((score) => (
+                  <button key={score.score_id} type="button" className="card" disabled={busy}
+                    onClick={() => chooseScore(score.score_id, scores)}>
+                    <span className="card-sheet">
+                      <NoteIcon />
+                    </span>
+                    <span className="card-name">{scoreLabel(score, t('scores.untitled'))}</span>
+                    <span className="card-detail">
+                      {t('home.measures', { count: score.measure_count })}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
           ))}
-          {openError && (
-            // Une lecture annulée n'est pas une erreur : simple remarque.
-            <p className={openError === 'cancelled' ? 'question-note' : 'error'}>
-              {t(`errors.${openError}`, { defaultValue: t('errors.unexpected') })}
-            </p>
-          )}
-          {reading === null && engine.kind === 'connected' && scoreId !== null ? (
-            <QuestionPanel key={`${scoreId}-${editVersion}`} api={engine.api} scoreId={scoreId}
-              onAnswered={refreshInfo} onFocus={focusMeasure} />
-          ) : (
-            reading === null && <p className="empty">{t('panels.questionsEmpty')}</p>
-          )}
-        </section>
-        <section className="panel" aria-labelledby="panel-result">
-          <h2 id="panel-result">{t('panels.result')}</h2>
-          {engine.kind === 'connected' && scoreId !== null && reading === null && selected !== null && (
-            <MeasureEditor api={engine.api} scoreId={scoreId} measureId={selected} symbolId={symbol}
-              version={version} onSelectSymbol={setSymbol}
-              onSelectMeasure={(id) => focusMeasure(id, null)} onEdited={afterEdit} />
-          )}
-          {engine.kind === 'connected' && scoreId !== null && reading === null ? (
-            <ScoreView api={engine.api} scoreId={scoreId} version={version}
-              selectedMeasure={selected} selectedSymbol={symbol} onSelect={focusMeasure} />
-          ) : (
-            <p className="empty">{t('panels.resultEmpty')}</p>
-          )}
-        </section>
-      </main>
+        </main>
+      )}
+
+      {tab === 'score' && (
+        <>
+          <div className="toolbar" role="toolbar" aria-label={t('toolbar.label')}>
+            <button type="button" className="tool" onClick={openScore} disabled={busy}>
+              <OpenIcon />
+              {t('open.button')}
+            </button>
+            <button type="button" className="tool" onClick={() => setExporting(true)}
+              disabled={busy || scoreId === null}>
+              <ExportIcon />
+              {t('export.button')}
+            </button>
+            <span className="toolbar-separator" />
+            <button type="button" className="tool" onClick={() => setTransposing(true)}
+              disabled={busy || scoreId === null}>
+              <TransposeIcon />
+              {t('transpose.button')}
+            </button>
+            <button type="button" className="tool" onClick={() => setShowConductor(true)}
+              disabled={busy || scoreId === null}>
+              <ConductorIcon />
+              {t('conductor.button')}
+            </button>
+            <span className="toolbar-separator" />
+            <button type="button" className="tool" onClick={() => setShowRules(true)}
+              disabled={!connected}>
+              <RulesIcon />
+              {t('rules.button')}
+            </button>
+            <button type="button" className="tool" onClick={() => setShowPacks(true)}
+              disabled={!connected}>
+              <PacksIcon />
+              {t('packs.button')}
+            </button>
+            {scores.length > 0 && (
+              <label className="score-picker">
+                {t('scores.label')}
+                <select value={scoreId ?? ''} disabled={reading !== null}
+                  onChange={(e) => chooseScore(e.target.value ? Number(e.target.value) : null, scores)}>
+                  <option value="">{t('scores.choose')}</option>
+                  {groupByPiece(scores, t('scores.unknownPiece')).map(([title, parts]) => (
+                    <optgroup key={title} label={title}>
+                      {parts.map((score) => (
+                        <option key={score.score_id} value={score.score_id}>
+                          {t('scores.item', {
+                            name: scoreLabel(score, t('scores.untitled')),
+                            count: score.measure_count,
+                          })}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+
+          <main className="workspace">
+            <Dock id="questions" title={t('panels.questions')} open={docks.questions}
+              onToggle={() => toggleDock('questions')}>
+              {notices}
+              {reading === null && engine.kind === 'connected' && scoreId !== null ? (
+                <QuestionPanel key={`${scoreId}-${editVersion}`} api={engine.api} scoreId={scoreId}
+                  onAnswered={refreshInfo} onFocus={focusMeasure} />
+              ) : (
+                reading === null && <p className="empty">{t('panels.questionsEmpty')}</p>
+              )}
+            </Dock>
+
+            <Dock id="scan" title={t('panels.scan')} open={docks.scan}
+              onToggle={() => toggleDock('scan')}>
+              {engine.kind === 'connected' && scoreId !== null && page !== null && reading === null ? (
+                <ScanView api={engine.api} scoreId={scoreId} page={page} version={version}
+                  selectedMeasure={selected} onPage={setPage} onSelect={focusMeasure} />
+              ) : (
+                <p className="empty">
+                  {current?.derived === 'assembled' ? t('conductor.noPages') : t('panels.scanEmpty')}
+                </p>
+              )}
+            </Dock>
+
+            <section className="canvas" aria-labelledby="result-title">
+              <div className="dock-header">
+                <h2 id="result-title">{t('panels.result')}</h2>
+              </div>
+              <div className="canvas-body">
+                {reading !== null && engine.kind === 'connected' && (
+                  <ReadingProgress
+                    state={reading}
+                    onCancel={() => {
+                      setReading({ ...reading, cancelling: true })
+                      void engine.api.cancel_reading()
+                    }}
+                  />
+                )}
+                {engine.kind === 'connected' && scoreId !== null && reading === null && selected !== null && (
+                  <MeasureEditor api={engine.api} scoreId={scoreId} measureId={selected} symbolId={symbol}
+                    version={version} onSelectSymbol={setSymbol}
+                    onSelectMeasure={(id) => focusMeasure(id, null)} onEdited={afterEdit} />
+                )}
+                {engine.kind === 'connected' && scoreId !== null && reading === null ? (
+                  <div className="sheet">
+                    <ScoreView api={engine.api} scoreId={scoreId} version={version}
+                      selectedMeasure={selected} selectedSymbol={symbol} onSelect={focusMeasure} />
+                  </div>
+                ) : (
+                  reading === null && <p className="empty">{t('panels.resultEmpty')}</p>
+                )}
+              </div>
+            </section>
+          </main>
+        </>
+      )}
 
       {transposing && engine.kind === 'connected' && scoreId !== null && (
         <TransposeDialog api={engine.api} scoreId={scoreId} onClose={() => setTransposing(false)}
