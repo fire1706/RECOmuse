@@ -113,6 +113,9 @@ def main(argv: list[str] | None = None) -> None:
         # charger des modules JavaScript directement depuis le disque (file://).
         webview.start(debug=args.dev)
     finally:
+        # Fenêtre fermée pendant une lecture : Audiveris est arrêté, sinon il continuerait
+        # à travailler en arrière-plan, pour rien.
+        api._stop_reading()
         conn.close()
 
 

@@ -29,6 +29,7 @@ import numpy as np
 
 from recomuse.importer import ImportedPage, preprocess
 from recomuse.importer.loading import read_gray
+from recomuse.progress import ReadingCancelled
 from recomuse.recognition.tools import ocr_language_spec
 
 # Étapes d'Audiveris pour chaque feuille, dans l'ordre (voir « Audiveris -help »).
@@ -205,11 +206,32 @@ def movement_files(output_dir: Path, book_name: str = BOOK_NAME) -> list[Path]:
     return [path for _, path in sorted(numbered)]
 
 
+def _wait(process: subprocess.Popen, deadline: float,
+          cancel: threading.Event | None) -> int:
+    """Attend la fin d'Audiveris, en regardant deux fois par seconde si l'annulation a
+    été demandée ou si le temps maximal est dépassé (Audiveris est alors arrêté)."""
+    while True:
+        try:
+            return process.wait(timeout=0.5)
+        except subprocess.TimeoutExpired:
+            cancelled = cancel is not None and cancel.is_set()
+            if cancelled or time.perf_counter() > deadline:
+                process.kill()
+                process.wait()
+                if cancelled:
+                    raise ReadingCancelled() from None
+                raise
+
+
 def run_audiveris(audiveris: Path, book: BookImage, output_dir: Path,
                   tessdata: Path | None = None,
                   on_progress: ProgressCallback | None = None,
-                  timeout_seconds: float | None = None) -> AudiverisRun:
-    """Lance Audiveris sur un livre et attend la fin du travail."""
+                  timeout_seconds: float | None = None,
+                  cancel: threading.Event | None = None) -> AudiverisRun:
+    """Lance Audiveris sur un livre et attend la fin du travail.
+
+    `cancel` : si cet événement est déclenché (bouton « Annuler »), Audiveris est arrêté
+    et ReadingCancelled est levée."""
     output_dir.mkdir(parents=True, exist_ok=True)
     # Résultats d'un passage précédent : à effacer, sinon un ancien « mvt5 » pourrait
     # se mêler aux nouveaux mouvements. (Uniquement nos propres fichiers de travail.)
@@ -246,10 +268,8 @@ def run_audiveris(audiveris: Path, book: BookImage, output_dir: Path,
     reader = threading.Thread(target=read_console, daemon=True)
     reader.start()
     try:
-        exit_code = process.wait(timeout=timeout_seconds)
+        exit_code = _wait(process, start + timeout_seconds, cancel)
     except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
         raise AudiverisError("audiveris_timeout", f"plus de {timeout_seconds:.0f} s") from None
     finally:
         reader.join(timeout=5)

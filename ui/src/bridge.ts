@@ -245,13 +245,24 @@ export interface EngineError {
 
 export type OpenResult = { scores: ScoreSummary[] } | EngineError
 
+/** Où en est la lecture d'un fichier (barre de progression). */
+export interface ReadingState {
+  stage: string // import, vector, texts, audiveris, model, done
+  page: number | null // page en cours dans l'étape (à partir de 1)
+  pages: number | null
+  fraction: number // part du travail faite, de 0 à 1
+  elapsed: number // secondes depuis le début
+  cancelling: boolean // « Annuler » demandé, arrêt en cours
+}
+
 /** Méthodes Python accessibles depuis l'interface. */
 export interface PythonApi {
   ping(): Promise<string>
   get_app_info(): Promise<AppInfo>
   choose_file(filterLabel: string): Promise<string | null>
   open_file(path: string): Promise<OpenResult>
-  get_progress(): Promise<{ stage: string | null }>
+  get_progress(): Promise<ReadingState | { stage: null }>
+  cancel_reading(): Promise<{ cancelling: boolean }>
   list_scores(): Promise<ScoreSummary[]>
   get_questions(scoreId: number): Promise<QuestionsState | EngineError>
   answer_question(

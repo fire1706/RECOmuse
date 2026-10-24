@@ -35,6 +35,7 @@ from recomuse.learning import packs, rules
 from recomuse.learning.corrections import CorrectionError, CorrectionService
 from recomuse.learning.journal import CorrectionJournal
 from recomuse.model.store import load_model
+from recomuse.progress import ReadingCancelled, ReadingProgress
 from recomuse.questions.session import QuestionError, QuestionSession
 from recomuse.recognition.audiveris import AudiverisError
 from recomuse.recognition.tools import ToolNotFoundError
@@ -78,7 +79,7 @@ class Api:
         self._corrections = CorrectionService(conn)
         self._questions = QuestionSession(conn, self._corrections)
         self._window = None                 # fenêtre pywebview, donnée par app.py
-        self._progress: str | None = None   # étape de la lecture en cours (library.STAGES)
+        self._reading: ReadingProgress | None = None   # lecture en cours (barre, annulation)
         self._busy = threading.Lock()       # une seule lecture de fichier à la fois
         self._db = threading.RLock()        # un seul appel à la fois sur la base
 
@@ -118,23 +119,32 @@ class Api:
         if not self._busy.acquire(blocking=False):
             return {"error": "busy"}
         try:
-            self._progress = "import"
+            self._reading = ReadingProgress()
             with self._db:
-                scores = library.open_file(self._conn, Path(path),
-                                           progress=self._set_progress)
+                scores = library.open_file(self._conn, Path(path), progress=self._reading)
             return {"scores": scores}
-        except (ScoreImportError, ToolNotFoundError, AudiverisError) as error:
+        except (ScoreImportError, ToolNotFoundError, AudiverisError,
+                ReadingCancelled) as error:
             return {"error": error.code}
         except Exception:
             log.exception("Lecture impossible : %s", path)
             return {"error": "unexpected"}
         finally:
-            self._progress = None
+            self._reading = None
             self._busy.release()
 
     def get_progress(self) -> dict:
-        """Étape de la lecture en cours (None : aucune lecture)."""
-        return {"stage": self._progress}
+        """Où en est la lecture en cours : {"stage", "page", "pages", "fraction" (0 à 1),
+        "elapsed" (secondes), "cancelling"} ; {"stage": None} s'il n'y en a pas."""
+        reading = self._reading
+        return reading.to_dict() if reading else {"stage": None}
+
+    def cancel_reading(self) -> dict:
+        """Bouton « Annuler » : demande l'arrêt de la lecture en cours."""
+        reading = self._reading
+        if reading is not None:
+            reading.cancel()
+        return {"cancelling": reading is not None}
 
     def list_scores(self) -> list[dict]:
         """Partitions déjà lues, de la plus récente à la plus ancienne."""
@@ -339,8 +349,15 @@ class Api:
 
     # --- Interne --------------------------------------------------------------------------
 
-    def _set_progress(self, stage: str) -> None:
-        self._progress = stage
+    def _stop_reading(self, timeout: float = 10.0) -> bool:
+        """À la fermeture de la fenêtre : annule la lecture en cours et attend qu'elle
+        s'arrête (au plus `timeout` secondes). Renvoie True si plus rien ne tourne.
+        Privé (nom en « _ ») : l'interface ne peut pas l'appeler."""
+        self.cancel_reading()
+        if not self._busy.acquire(timeout=timeout):
+            return False
+        self._busy.release()
+        return True
 
     def _guarded(self, action) -> dict:
         """Exécute une demande (une à la fois sur la base) ; une erreur devient

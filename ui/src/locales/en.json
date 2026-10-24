@@ -26,13 +26,23 @@
     "button": "Open a score…",
     "filter": "Scores PDF or image",
     "stage": {
-      "import": "Preparing the pages…",
-      "recognition": "Reading the score… This can take a minute or two per scanned page.",
-      "model": "Putting the score in order…",
-      "done": "Reading finished."
+      "import": "Preparing the pages",
+      "vector": "Reading the vector pages",
+      "texts": "Reading titles and instrument names",
+      "audiveris": "Recognizing the music",
+      "model": "Putting the score in order",
+      "done": "Reading finished"
     },
     "parts_one": "{{count}} part read.",
-    "parts_other": "{{count}} parts found in this file: pick one from the list."
+    "parts_other": "{{count}} parts found in this file: pick one from the list.",
+    "page": "page {{page}} of {{pages}}",
+    "progress": "Reading progress",
+    "eta_one": "about {{count}} minute left",
+    "eta_other": "about {{count}} minutes left",
+    "etaSoon": "less than a minute left",
+    "etaUnknown": "estimating the time left…",
+    "cancel": "Cancel",
+    "cancelling": "stopping…"
   },
   "scores": {
     "label": "Score",
@@ -122,7 +132,8 @@
     "pack_too_new": "This pack was made by a newer version of RECOmuse: update RECOmuse.",
     "pack_already_imported": "This pack has already been imported.",
     "not_a_conductor": "This score has a single instrument: there are no parts to extract.",
-    "conductor_needs_parts": "At least two parts are needed to assemble a conductor score."
+    "conductor_needs_parts": "At least two parts are needed to assemble a conductor score.",
+    "cancelled": "Reading cancelled."
   },
   "scan": {
     "loading": "Loading the page…",

@@ -59,6 +59,7 @@ export function fakeApi(overrides: Partial<PythonApi> = {}, info: AppInfo = fake
     choose_file: async () => null,
     open_file: async () => ({ scores: [] }),
     get_progress: async () => ({ stage: null }),
+    cancel_reading: async () => ({ cancelling: false }),
     list_scores: async () => [],
     get_questions: async () => questionsState([]),
     answer_question: async () => questionsState([]),

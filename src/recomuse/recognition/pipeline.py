@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Literal
 
 from recomuse.importer import ImportedScore
+from recomuse.progress import AUDIVERIS_STEPS_PER_SHEET, ReadingCancelled, ReadingProgress
 from recomuse.recognition import tools
 from recomuse.recognition.audiveris import (
     BOOK_NAME,
@@ -99,11 +100,13 @@ class RecognitionResult:
 
 def recognize_score(score: ImportedScore, on_progress: ProgressCallback | None = None,
                     output_dir: Path | None = None,
-                    audiveris_for_vector_pages: bool = False) -> RecognitionResult:
+                    audiveris_for_vector_pages: bool = False,
+                    reading: ReadingProgress | None = None) -> RecognitionResult:
     """Reconnaît la musique et les textes d'une partition importée (tâche 3).
 
     audiveris_for_vector_pages=True : envoie aussi à Audiveris les pages lues
     vectoriellement (pour comparer les deux lectures).
+    `reading` : progression montrée par l'interface, et annulation (ReadingCancelled).
     Lève ToolNotFoundError si Audiveris est nécessaire mais absent, AudiverisError s'il
     échoue ou s'il n'y a aucune page de musique.
     """
@@ -121,14 +124,27 @@ def recognize_score(score: ImportedScore, on_progress: ProgressCallback | None =
     # 1. Lecture vectorielle (rapide : moins d'une seconde par page).
     vector = None
     pdf_vector_pages = [p.page_number for p in score.pages if p.kind == "vector"]
-    if pdf_vector_pages and score.source_path.suffix.lower() == ".pdf":
-        vector = read_vector_pdf(score.source_path, pdf_vector_pages)
+    if pdf_vector_pages and score.source_path.suffix.lower() != ".pdf":
+        pdf_vector_pages = []
+    if reading:
+        # Plan prévu : pages vectorielles, puis les autres par Tesseract et Audiveris.
+        others = sum(1 for p in music_pages if p.page_number not in pdf_vector_pages)
+        reading.plan(vector=len(pdf_vector_pages), texts=others,
+                     audiveris=others * AUDIVERIS_STEPS_PER_SHEET)
+    if pdf_vector_pages:
+        on_page = (lambda done, total: reading.update("vector", done, total, done + 1, total)
+                   ) if reading else None
+        vector = read_vector_pdf(score.source_path, pdf_vector_pages, on_page)
     read_by_vector = {p.page_number for p in vector.pages if p.systems} if vector else set()
 
     # 2. En-tête de chaque page de musique : texte exact du PDF si possible, sinon Tesseract.
     page_headers: dict[int, HeaderInfo] = {}
     first_lines: list[OcrLine] = []
+    by_ocr = [p for p in music_pages if p.page_number not in read_by_vector]
     for page in music_pages:
+        if reading and page in by_ocr:
+            done = by_ocr.index(page)
+            reading.update("texts", done, len(by_ocr), done + 1, len(by_ocr))
         lines = _page_header_lines(page, vector, status, output_dir, warnings)
         if lines is None:
             continue
@@ -144,10 +160,14 @@ def recognize_score(score: ImportedScore, on_progress: ProgressCallback | None =
     run = None
     movements: list[MovementSummary] = []
     skipped: list[int] = []
+    if reading:
+        reading.plan(audiveris=len(for_audiveris) * AUDIVERIS_STEPS_PER_SHEET)
     if for_audiveris:
         audiveris = tools.require(status.audiveris, "audiveris_not_found")
         run, skipped = _run_skipping_crashes(audiveris, for_audiveris, output_dir,
-                                             status.tessdata, on_progress)
+                                             status.tessdata, _audiveris_progress(on_progress,
+                                                                                  reading),
+                                             reading.cancel_event if reading else None)
         if skipped:
             warnings.append("audiveris_pages_skipped")
         # 4. Résumé de la musique, et textes d'Audiveris pour compléter l'en-tête.
@@ -162,9 +182,29 @@ def recognize_score(score: ImportedScore, on_progress: ProgressCallback | None =
                              page_headers=page_headers, skipped_pages=skipped)
 
 
+def _audiveris_progress(on_progress: ProgressCallback | None,
+                        reading: ReadingProgress | None) -> ProgressCallback | None:
+    """Avancée d'Audiveris (étapes faites / au total) vers `on_progress` et `reading`."""
+    if reading is None:
+        return on_progress
+
+    def report(done: int, total: int) -> None:
+        if on_progress:
+            on_progress(done, total)
+        sheets = max(1, total // AUDIVERIS_STEPS_PER_SHEET)
+        sheet = min(done // AUDIVERIS_STEPS_PER_SHEET + 1, sheets)
+        try:
+            reading.update("audiveris", done, total, sheet, sheets)
+        except ReadingCancelled:
+            # Appelé depuis le fil qui lit la console d'Audiveris : c'est run_audiveris
+            # qui arrête Audiveris et signale l'annulation.
+            pass
+    return report
+
+
 def _run_skipping_crashes(audiveris: Path, pages: list, output_dir: Path,
-                          tessdata: Path | None, on_progress: ProgressCallback | None
-                          ) -> tuple[AudiverisRun, list[int]]:
+                          tessdata: Path | None, on_progress: ProgressCallback | None,
+                          cancel=None) -> tuple[AudiverisRun, list[int]]:
     """Lance Audiveris ; s'il plante sur certaines pages, le relance sans elles.
 
     Audiveris a des erreurs internes sur certaines pages (vu sur le corpus réel), et
@@ -175,7 +215,9 @@ def _run_skipping_crashes(audiveris: Path, pages: list, output_dir: Path,
     while True:
         book = build_book_image(pages, output_dir / f"{BOOK_NAME}.tif")
         try:
-            return run_audiveris(audiveris, book, output_dir, tessdata, on_progress), skipped
+            run = run_audiveris(audiveris, book, output_dir, tessdata, on_progress,
+                                cancel=cancel)
+            return run, skipped
         except AudiverisError as error:
             crashed = {book.sheet_pages[sheet - 1] for sheet in crashed_sheets(error.log_path)
                        if sheet <= len(book.sheet_pages)}

@@ -26,13 +26,23 @@
     "button": "Ouvrir une partition…",
     "filter": "Partitions PDF ou image",
     "stage": {
-      "import": "Préparation des pages…",
-      "recognition": "Lecture de la partition… Cela peut prendre une ou deux minutes par page scannée.",
-      "model": "Mise en ordre de la partition…",
-      "done": "Lecture terminée."
+      "import": "Préparation des pages",
+      "vector": "Lecture des pages vectorielles",
+      "texts": "Lecture des titres et des noms d'instrument",
+      "audiveris": "Reconnaissance de la musique",
+      "model": "Mise en ordre de la partition",
+      "done": "Lecture terminée"
     },
     "parts_one": "{{count}} partie lue.",
-    "parts_other": "{{count}} parties trouvées dans ce fichier : choisissez-en une dans la liste."
+    "parts_other": "{{count}} parties trouvées dans ce fichier : choisissez-en une dans la liste.",
+    "page": "page {{page}} sur {{pages}}",
+    "progress": "Avancement de la lecture",
+    "eta_one": "environ {{count}} minute restante",
+    "eta_other": "environ {{count}} minutes restantes",
+    "etaSoon": "moins d'une minute restante",
+    "etaUnknown": "calcul du temps restant…",
+    "cancel": "Annuler",
+    "cancelling": "arrêt en cours…"
   },
   "scores": {
     "label": "Partition",
@@ -122,7 +132,8 @@
     "pack_too_new": "Ce pack a été fait par une version plus récente de RECOmuse : mettez RECOmuse à jour.",
     "pack_already_imported": "Ce pack a déjà été importé.",
     "not_a_conductor": "Cette partition n'a qu'un instrument : il n'y a pas de parties à extraire.",
-    "conductor_needs_parts": "Il faut au moins deux parties pour assembler un conducteur."
+    "conductor_needs_parts": "Il faut au moins deux parties pour assembler un conducteur.",
+    "cancelled": "Lecture annulée."
   },
   "scan": {
     "loading": "Chargement de la page…",

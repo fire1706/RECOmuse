@@ -9,11 +9,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { type AppInfo, isError, type PythonApi, type ScoreSummary, waitForBridge } from './bridge'
+import {
+  type AppInfo,
+  isError,
+  type PythonApi,
+  type ReadingState,
+  type ScoreSummary,
+  waitForBridge,
+} from './bridge'
 import { SUPPORTED_LANGUAGES } from './i18n'
 import MeasureEditor from './MeasureEditor'
 import PacksDialog from './PacksDialog'
 import QuestionPanel from './QuestionPanel'
+import ReadingProgress from './ReadingProgress'
 import RulesDialog from './RulesDialog'
 import ScanView from './ScanView'
 import ScoreView from './ScoreView'
@@ -30,6 +38,16 @@ type EngineState =
 
 /** Intervalle entre deux demandes « où en est la lecture ? », en millisecondes. */
 const PROGRESS_INTERVAL_MS = 700
+
+// État affiché dès le clic, avant la première réponse du moteur.
+const READING_START: ReadingState = {
+  stage: 'import',
+  page: null,
+  pages: null,
+  fraction: 0,
+  elapsed: 0,
+  cancelling: false,
+}
 
 interface AppProps {
   /** Permet aux tests de fournir un faux pont ; par défaut, le vrai pont pywebview. */
@@ -61,7 +79,8 @@ export default function App({ connect = waitForBridge }: AppProps) {
   const [engine, setEngine] = useState<EngineState>({ kind: 'connecting' })
   const [scores, setScores] = useState<ScoreSummary[]>([])
   const [scoreId, setScoreId] = useState<number | null>(null)
-  const [reading, setReading] = useState<string | null>(null) // étape de la lecture en cours
+  // Lecture en cours (étape, page, part faite...) ; null : aucune lecture.
+  const [reading, setReading] = useState<ReadingState | null>(null)
   const [openError, setOpenError] = useState<string | null>(null)
   const [openedParts, setOpenedParts] = useState<number | null>(null)
   // Parties déjà lues et corrigées : ce qui a été repris à l'ouverture.
@@ -159,10 +178,10 @@ export default function App({ connect = waitForBridge }: AppProps) {
     setOpenError(null)
     setOpenedParts(null)
     setRemembered([])
-    setReading('import')
+    setReading(READING_START)
     poll.current = window.setInterval(async () => {
-      const { stage } = await api.get_progress()
-      if (stage) setReading(stage)
+      const state = await api.get_progress()
+      if (state.stage !== null) setReading(state)
     }, PROGRESS_INTERVAL_MS)
     try {
       const result = await api.open_file(path)
@@ -271,10 +290,14 @@ export default function App({ connect = waitForBridge }: AppProps) {
         </section>
         <section className="panel panel-questions" aria-labelledby="panel-questions">
           <h2 id="panel-questions">{t('panels.questions')}</h2>
-          {reading !== null && (
-            <p className="reading" role="progressbar" aria-busy="true">
-              {t(`open.stage.${reading}`, { defaultValue: t('open.stage.recognition') })}
-            </p>
+          {reading !== null && engine.kind === 'connected' && (
+            <ReadingProgress
+              state={reading}
+              onCancel={() => {
+                setReading({ ...reading, cancelling: true })
+                void engine.api.cancel_reading()
+              }}
+            />
           )}
           {openedParts !== null && openedParts > 1 && (
             <p className="question-note">{t('open.parts', { count: openedParts })}</p>
@@ -292,7 +315,10 @@ export default function App({ connect = waitForBridge }: AppProps) {
             </p>
           ))}
           {openError && (
-            <p className="error">{t(`errors.${openError}`, { defaultValue: t('errors.unexpected') })}</p>
+            // Une lecture annulée n'est pas une erreur : simple remarque.
+            <p className={openError === 'cancelled' ? 'question-note' : 'error'}>
+              {t(`errors.${openError}`, { defaultValue: t('errors.unexpected') })}
+            </p>
           )}
           {reading === null && engine.kind === 'connected' && scoreId !== null ? (
             <QuestionPanel key={`${scoreId}-${editVersion}`} api={engine.api} scoreId={scoreId}

@@ -188,3 +188,20 @@ def test_tessdata_is_passed_to_audiveris(tmp_path, fake_audiveris):
     audiveris.run_audiveris(fake_audiveris, book, tmp_path / "out", tessdata=tessdata)
     args = (tmp_path / "out" / "fake-args.txt").read_text(encoding="utf-8").splitlines()
     assert "org.audiveris.omr.text.Language.defaultSpecification=fra" in args
+
+
+def test_cancel_stops_audiveris(tmp_path, fake_audiveris, monkeypatch):
+    import threading
+    import time
+
+    from recomuse.progress import ReadingCancelled
+
+    # Audiveris qui ne finit jamais : « Annuler » l'arrête en moins d'une seconde.
+    monkeypatch.setenv("FAKE_AUDIVERIS_MODE", "hang")
+    cancel = threading.Event()
+    threading.Timer(0.5, cancel.set).start()
+    start = time.perf_counter()
+    with pytest.raises(ReadingCancelled):
+        audiveris.run_audiveris(fake_audiveris, make_book(tmp_path), tmp_path / "out",
+                                cancel=cancel)
+    assert time.perf_counter() - start < 5

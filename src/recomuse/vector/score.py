@@ -11,6 +11,7 @@ au premier système, souvent abrégé ensuite) : staff_names() le retrouve pour 
 """
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -131,10 +132,12 @@ class VectorScore:
         }
 
 
-def read_vector_pdf(path: Path | str, page_numbers: list[int] | None = None) -> VectorScore:
+def read_vector_pdf(path: Path | str, page_numbers: list[int] | None = None,
+                    on_page: Callable[[int, int], None] | None = None) -> VectorScore:
     """Lit les pages vectorielles d'un PDF (toutes, ou celles de `page_numbers`, à partir de 1).
 
     Les pages scannées ou blanches sont ignorées : elles passent par Audiveris.
+    `on_page(faites, total)` est appelé après chaque page (barre de progression).
     """
     path = Path(path)
     pages = []
@@ -142,7 +145,9 @@ def read_vector_pdf(path: Path | str, page_numbers: list[int] | None = None) -> 
     states: dict[int, dict] = {}   # clé, armure, chiffrage de chaque partie, de page en page
     with pymupdf.open(path) as doc:
         numbers = page_numbers or range(1, doc.page_count + 1)
-        for number in numbers:
+        for index, number in enumerate(numbers):
+            if on_page:
+                on_page(index, len(numbers))
             page = doc[number - 1]
             if analyze_pdf_page(page).kind != "vector":
                 continue

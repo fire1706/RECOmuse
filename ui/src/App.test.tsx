@@ -72,7 +72,8 @@ describe('App', () => {
     await screen.findByText(/Moteur prêt/)
 
     fireEvent.click(screen.getByRole('button', { name: 'Ouvrir une partition…' }))
-    expect(await screen.findByText('Préparation des pages…')).toBeInTheDocument()
+    expect(await screen.findByText('Préparation des pages')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: 'Avancement de la lecture' })).toBeInTheDocument()
     expect(open_file).toHaveBeenCalledWith('C:/partitions/marche.pdf')
 
     await act(async () =>

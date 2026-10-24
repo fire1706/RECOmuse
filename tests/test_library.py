@@ -5,6 +5,7 @@ import pytest
 from recomuse import library
 from recomuse.api import Api
 from recomuse.model.store import load_model
+from recomuse.progress import ReadingProgress
 from recomuse.recognition import tools
 from recomuse.recognition.tools import ToolsStatus
 
@@ -20,10 +21,10 @@ def no_tools(monkeypatch):
 
 def test_open_file_reads_and_stores_the_score(conn, tmp_path, no_tools):
     pdf = part_pdf(tmp_path / "Marche d'Acoz (flûte).pdf")
-    stages = []
-    [summary] = library.open_file(conn, pdf, progress=stages.append,
+    progress = ReadingProgress()
+    [summary] = library.open_file(conn, pdf, progress=progress,
                                   work_root=tmp_path / "travail")
-    assert stages == ["import", "recognition", "model", "done"]
+    assert progress.to_dict()["stage"] == "done" and progress.to_dict()["fraction"] == 1.0
     assert summary["title"] == "MARCHE D'ACOZ" and summary["instrument"] == "Flute 1"
     assert summary["measure_count"] == 24 and summary["pages"] == [1]
     assert summary["source_name"] == pdf.name
@@ -123,3 +124,46 @@ def test_simultaneous_calls_do_not_mix(conn, tmp_path, no_tools, monkeypatch):
     with ThreadPoolExecutor(max_workers=8) as pool:
         results = list(pool.map(lambda call: call(), calls))
     assert not [r for r in results if isinstance(r, dict) and "error" in r]
+
+
+def test_cancelled_reading_stores_nothing(conn, tmp_path, no_tools):
+    from recomuse.progress import ReadingCancelled
+
+    progress = ReadingProgress()
+    progress.cancel()
+    with pytest.raises(ReadingCancelled):
+        library.open_file(conn, part_pdf(tmp_path / "partie.pdf"), progress=progress,
+                          work_root=tmp_path / "travail")
+    assert library.list_scores(conn) == []
+
+
+def test_api_progress_when_idle_and_cancel_without_reading(conn):
+    api = Api(conn, ":memory:")
+    assert api.get_progress() == {"stage": None}
+    assert api.cancel_reading() == {"cancelling": False}
+
+
+def test_closing_the_window_stops_the_reading(conn, tmp_path, no_tools, monkeypatch):
+    import threading
+    import time
+
+    from recomuse.progress import ReadingCancelled
+
+    monkeypatch.setattr("recomuse.paths.imports_dir", lambda: tmp_path / "travail")
+
+    def slow_import(source, work_dir, on_progress=None):
+        # Import qui dure, mais s'arrête dès que l'annulation est demandée.
+        for page in range(100):
+            on_progress(page, 100)
+            time.sleep(0.05)
+        raise AssertionError("pas annulé")
+    monkeypatch.setattr(library, "import_score", slow_import)
+    api = Api(conn, ":memory:")
+    result = {}
+    reader = threading.Thread(target=lambda: result.update(api.open_file("partie.pdf")))
+    reader.start()
+    while api.get_progress()["stage"] is None:
+        time.sleep(0.01)
+    assert api._stop_reading(timeout=5)
+    reader.join()
+    assert result == {"error": ReadingCancelled.code}

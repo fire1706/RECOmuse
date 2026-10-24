@@ -111,8 +111,45 @@ button:disabled {
   opacity: 0.6;
 }
 
+/* Barre de progression de la lecture d'un fichier. */
 .reading {
-  font-style: italic;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.reading-stage {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.reading-page {
+  font-weight: normal;
+  color: #57606a;
+}
+
+.reading-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: #e6e9ee;
+  overflow: hidden;
+}
+
+.reading-bar-fill {
+  height: 100%;
+  background: #1d72d8;
+  transition: width 0.6s ease;
+}
+
+.reading-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #57606a;
 }
 
 .error {

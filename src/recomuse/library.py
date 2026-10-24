@@ -11,13 +11,12 @@ Une partie déjà lue et corrigée (mêmes pages : learning/memory.py) reprend s
 corrections et ses réponses aux questions ; à défaut, celles d'un pack d'apprentissage
 reçu d'un autre membre (learning/packs.py).
 
-C'est long (une ou deux minutes pour une page scannée) : `progress` est appelé à chaque
-étape, pour que l'interface puisse dire où on en est.
+C'est long (une demi-minute par page scannée) : `progress` (progress.ReadingProgress) note
+où on en est, pour la barre de progression de l'interface, et permet d'annuler.
 """
 
 import re
 import sqlite3
-from collections.abc import Callable
 from pathlib import Path
 
 from recomuse import paths
@@ -30,34 +29,37 @@ from recomuse.model.build import build_model
 from recomuse.model.score import ScoreModel
 from recomuse.model.split import normalized, split_parts
 from recomuse.model.store import load_model, save_model
+from recomuse.progress import AUDIVERIS_STEPS_PER_SHEET, ReadingProgress
 from recomuse.questions.images import page_image
 from recomuse.recognition.pipeline import recognize_score
 
-# Étapes annoncées à l'interface (traduites par elle).
-STAGES = ("import", "recognition", "model", "done")
-
-ProgressCallback = Callable[[str], None]
-
 
 def open_file(conn: sqlite3.Connection, source: Path | str,
-              progress: ProgressCallback | None = None,
+              progress: ReadingProgress | None = None,
               work_root: Path | None = None) -> list[dict]:
     """Lit un fichier (PDF ou image) et enregistre une partition par partie trouvée.
     Renvoie le résumé de chacune. Le fichier d'origine n'est jamais modifié.
 
     Lève les erreurs du moteur (import, outil manquant, Audiveris) : leur `code` est
-    traduit par l'interface."""
-    report = progress or (lambda stage: None)
+    traduit par l'interface ; ReadingCancelled si l'utilisateur a annulé (rien n'est
+    alors enregistré dans la base)."""
+    progress = progress or ReadingProgress()
     source = Path(source)
     work_dir = (work_root or paths.imports_dir()) / _folder_name(source)
 
-    report("import")
-    score = import_score(source, work_dir)
-    report("recognition")
-    recognition = recognize_score(score)
-    report("model")
+    def imported(done: int, total: int) -> None:
+        # Tant que les pages ne sont pas prêtes, on compte au pire : toutes scannées.
+        progress.plan(texts=total, audiveris=total * AUDIVERIS_STEPS_PER_SHEET, model=total)
+        progress.update("import", done, total, min(done + 1, total), total)
+
+    score = import_score(source, work_dir, on_progress=imported)
+    recognition = recognize_score(score, reading=progress)
+    pages = len(score.pages)
+    progress.update("model", 0, pages)
     model = build_model(score, recognition)
     parts = split_parts(model, recognition.page_headers)
+    # Dernier moment pour annuler : ensuite, les parties sont enregistrées.
+    progress.check()
 
     summaries = []
     created: set[int] = set()
@@ -85,7 +87,7 @@ def open_file(conn: sqlite3.Connection, source: Path | str,
                          "read_at": shared["created_at"]}
             result = summary(score_id, load_model(conn, score_id)) | {"memory": replayed}
         summaries.append(result)
-    report("done")
+    progress.finish()
     return summaries
 
 
