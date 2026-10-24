@@ -12,9 +12,12 @@ Les textes ne sont PAS écrits ici : une question porte un code (« multirest_mi
 des valeurs (« count » : 8), un choix porte une étiquette (« rest_measures ») ; l'interface
 les traduit (ui/src/locales).
 
-Ordre des questions : d'abord celles dont la réponse peut corriger beaucoup de mesures
-(clé octaviée, chiffrage, pauses multiples), puis les notes ; à l'intérieur, dans l'ordre
-de la partition.
+Ordre des questions : celui de la partition, mesure par mesure (comme un musicien la
+relit). Dans une même mesure, d'abord celles dont la réponse peut corriger beaucoup de
+mesures (clé, chiffrage, pauses multiples), puis les notes. Après chaque réponse, la
+partition est revalidée et les questions recalculées (questions/session.py) : un doute qui
+découlait d'une erreur plus haut (un chiffrage manqué, une clé mal lue) disparaît avant
+d'être posé, au lieu d'entraîner des erreurs en cascade.
 Regroupement : une seule question pour plusieurs doutes de même cause. Les notes hors de
 la tessiture d'une partie, toutes dans le même sens, sont une seule question (« ces 12
 notes sont-elles une octave trop haut ? »). Deux problèmes qui proposent de changer la
@@ -31,6 +34,7 @@ from recomuse.validation.issues import Fix, Issue, ValidationReport
 
 # Ordre de priorité des types de questions.
 CODE_ORDER = [
+    "clef_sign_suspicious",
     "clef_octave_suspicious",
     "time_signature_missing",
     "time_signature_missed",
@@ -148,8 +152,12 @@ def build_questions(model: ScoreModel,
         question.signature = issue_signature(model, issues[0])
         questions[question.key] = question
 
+    # Ordre de la partition : mesure, puis partie (dans un conducteur, toutes les portées
+    # d'une mesure avant la suivante), puis type de question.
+    part_order = {part.id: index for index, part in enumerate(model.parts)}
     ordered = sorted(questions.values(), key=lambda q: (
-        _rank(q.code), q.part_id, q.measure_numbers[0] if q.measure_numbers else 0))
+        q.measure_numbers[0] if q.measure_numbers else 0, part_order.get(q.part_id, 0),
+        _rank(q.code)))
     return ordered, unasked
 
 
@@ -186,6 +194,30 @@ def _clef_octave(model: ScoreModel, issue: Issue) -> Question | None:
                      params={"octave_change": change, "notes": issue.details.get("notes")},
                      choices=[Choice("accept", "clef_plain", fixes=list(issue.fixes)),
                               Choice("keep", "clef_octave", {"octave_change": change})])
+
+
+def _clef_sign(model: ScoreModel, issue: Issue) -> Question | None:
+    """Clé lue de sol alors que les notes qui suivent ne vont à l'instrument qu'en clé de fa
+    (ou l'inverse) : le musicien voit la clé et dit laquelle c'est. Changer la clé renomme
+    toutes les notes qu'elle gouverne (elles gardent leur place sur la portée)."""
+    read, proposed = issue.details.get("read"), issue.details.get("proposed")
+    params = {"read": read, "proposed": proposed, "notes": issue.details.get("notes"),
+              "reason": issue.details.get("reason")}
+    if issue.action.get("insert_clef"):
+        # Aucune clé au début : on l'ajoute dans la 1re mesure, et on renomme les notes.
+        accept = Choice("accept", f"clef_{proposed}", fixes=list(issue.fixes),
+                        additions=[NewSymbol(issue.action["measure_id"], "clef",
+                                             dict(issue.action["insert_clef"]))])
+        notes = [s for s in (_symbol(model, i) for i in issue.symbol_ids[:3]) if s]
+        return _question(model, issue, notes, params=params,
+                         choices=[accept, Choice("keep", f"clef_{read}")])
+    if not issue.fixes:
+        return None
+    clef = _symbol(model, issue.fixes[0].symbol_id)
+    return _question(model, issue, [clef] if clef else [], params=params,
+                     choices=[Choice("accept", f"clef_{proposed}", fixes=list(issue.fixes)),
+                              Choice("keep", f"clef_{read}" if read != "other"
+                                     else "clef_as_read")])
 
 
 def _note_position(model: ScoreModel, issue: Issue) -> Question | None:
@@ -236,14 +268,25 @@ def _time_signature(model: ScoreModel, issue: Issue) -> Question | None:
         return None
     beats, beat_type = (int(n) for n in proposed.split("/"))
     value = {"beats": beats, "beat_type": beat_type}
+    # Passage délimité (validation/durations.py) : l'ancien chiffrage revient après lui,
+    # pour que les mesures suivantes, justes, le restent.
+    back = issue.details.get("back")
+    restore = ([NewSymbol(issue.action["restore_measure_id"], "time",
+                          dict(issue.action["restore_time"]))]
+               if back and issue.action.get("restore_measure_id") else [])
+    label = "time_section" if restore else "time_is"
+    shown = {"time": proposed, "back": back} if restore else {"time": proposed}
     if issue.fixes:
-        accept = Choice("accept", "time_is", {"time": proposed}, fixes=list(issue.fixes))
+        accept = Choice("accept", label, shown, fixes=list(issue.fixes), additions=restore)
     else:
         target = _measure_at(part, issue.action.get("before_measure", first.number)) or first
-        accept = Choice("accept", "time_is", {"time": proposed},
-                        additions=[NewSymbol(target.id, "time", value)])
+        accept = Choice("accept", label, shown,
+                        additions=[NewSymbol(target.id, "time", value), *restore])
     choices = [accept]
     params = {"time": proposed, "measures": len(issue.measure_numbers)}
+    if restore:
+        params |= {"back": back, "first": first.number,
+                   "last": issue.details.get("last_measure")}
     if issue.code == "time_signature_missed":
         read = _time_text(model, part, first)
         choices.append(Choice("keep", "time_unchanged", {"time": read}))
@@ -301,6 +344,7 @@ def _multirest(model: ScoreModel, issue: Issue) -> Question | None:
 NEEDS_PROPOSAL = ("measure_number_mismatch", "part_measures_missing", "part_measures_extra")
 
 BUILDERS = {
+    "clef_sign_suspicious": _clef_sign,
     "clef_octave_suspicious": _clef_octave,
     "note_position_mismatch": _note_position,
     "time_signature_missed": _time_signature,

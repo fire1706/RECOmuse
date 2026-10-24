@@ -82,7 +82,11 @@
       "measure_number_mismatch": "D'après les numéros de mesure imprimés ({{printed_before}}, puis {{printed_after}}), il manque des mesures. Ce silence est-il une pause de {{count}} mesures ?",
       "part_measures_missing": "Les autres parties du morceau ont {{difference}} mesure(s) de plus ici. Ce silence est-il une pause de {{count}} mesures ?",
       "part_measures_extra": "Cette partie a {{difference}} mesure(s) de plus que les autres parties du morceau. Cette pause dure-t-elle {{count}} mesures ?",
-      "part_time_signature_differs": "Ici, {{agreeing_parts}} parties du morceau sur {{parts}} sont à {{time}}. Et celle-ci ?"
+      "part_time_signature_differs": "Ici, {{agreeing_parts}} parties du morceau sur {{parts}} sont à {{time}}. Et celle-ci ?",
+      "clef_sign_suspicious_range": "Cette clé a été lue comme une {{read}}, mais alors les {{notes}} notes qu'elle gouverne sortent de l'étendue de l'instrument. Avec une {{proposed}}, elles y seraient. Quelle clé voyez-vous ?",
+      "clef_sign_suspicious_change": "Cette clé a été lue comme une {{read}}, alors que la partie était en {{proposed}} jusqu'ici. Quelle clé voyez-vous ? (La réponse renomme les {{notes}} notes qui la suivent.)",
+      "time_signature_missed_section": "Les mesures {{first}} à {{last}} ne correspondent pas au chiffrage, mais la suivante, si. Ce passage est-il à {{time}}, avant de revenir à {{back}} ?",
+      "clef_sign_suspicious_missing": "Aucune clé n'a été lue au début de la partie : ces mesures s'affichent en clé de sol. La suite de la partie est en {{proposed}}. Est-ce aussi la clé du début ?"
     },
     "choices": {
       "clef_plain": "Une clé normale, sans 8",
@@ -99,14 +103,27 @@
       "rest_measures_other": "Oui, {{count}} mesures",
       "rest_as_read_one": "Non, une seule mesure, comme lu",
       "rest_as_read_other": "Non, {{count}} mesures, comme lu",
-      "time_as_read": "Non, {{time}}, comme lu"
+      "time_as_read": "Non, {{time}}, comme lu",
+      "clef_treble": "Une clé de sol",
+      "clef_bass": "Une clé de fa",
+      "clef_alto": "Une clé d'ut 3e ligne",
+      "clef_tenor": "Une clé d'ut 4e ligne",
+      "clef_as_read": "La clé lue est juste",
+      "time_section": "Oui, {{time}}, puis de nouveau {{back}}"
     },
     "compared_one": "Comparée à {{count}} autre partie du morceau.",
     "compared_other": "Comparée aux {{count}} autres parties du morceau.",
     "byRules_one": "{{count}} réponse donnée par les règles apprises.",
     "byRules_other": "{{count}} réponses données par les règles apprises.",
     "byMemory_one": "{{count}} réponse reprise d'une lecture précédente.",
-    "byMemory_other": "{{count}} réponses reprises d'une lecture précédente."
+    "byMemory_other": "{{count}} réponses reprises d'une lecture précédente.",
+    "clefs": {
+      "treble": "clé de sol",
+      "bass": "clé de fa",
+      "alto": "clé d'ut 3e ligne",
+      "tenor": "clé d'ut 4e ligne",
+      "other": "autre clé"
+    }
   },
   "errors": {
     "unexpected": "Une erreur inattendue s'est produite. Réessayez ; si elle revient, signalez-la.",

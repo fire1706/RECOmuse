@@ -82,7 +82,11 @@
       "measure_number_mismatch": "According to the printed bar numbers ({{printed_before}}, then {{printed_after}}), some bars are missing. Is this rest a {{count}}-bar rest?",
       "part_measures_missing": "The other parts of the piece have {{difference}} more bar(s) here. Is this rest a {{count}}-bar rest?",
       "part_measures_extra": "This part has {{difference}} more bar(s) than the other parts of the piece. Does this rest last {{count}} bars?",
-      "part_time_signature_differs": "Here, {{agreeing_parts}} of the {{parts}} parts of the piece are in {{time}}. What about this one?"
+      "part_time_signature_differs": "Here, {{agreeing_parts}} of the {{parts}} parts of the piece are in {{time}}. What about this one?",
+      "clef_sign_suspicious_range": "This clef was read as a {{read}}, but then the {{notes}} notes it governs fall outside the instrument's range. With a {{proposed}}, they would fit. Which clef do you see?",
+      "clef_sign_suspicious_change": "This clef was read as a {{read}}, while the part was in {{proposed}} until here. Which clef do you see? (The answer renames the {{notes}} notes that follow it.)",
+      "time_signature_missed_section": "Bars {{first}} to {{last}} do not match the time signature, but the next one does. Is this passage in {{time}}, before going back to {{back}}?",
+      "clef_sign_suspicious_missing": "No clef was read at the start of the part: these bars are shown in treble clef. The rest of the part is in {{proposed}}. Is it also the clef at the start?"
     },
     "choices": {
       "clef_plain": "A normal clef, without an 8",
@@ -99,14 +103,27 @@
       "rest_measures_other": "Yes, {{count}} bars",
       "rest_as_read_one": "No, a single bar, as read",
       "rest_as_read_other": "No, {{count}} bars, as read",
-      "time_as_read": "No, {{time}}, as read"
+      "time_as_read": "No, {{time}}, as read",
+      "clef_treble": "A treble clef",
+      "clef_bass": "A bass clef",
+      "clef_alto": "An alto clef",
+      "clef_tenor": "A tenor clef",
+      "clef_as_read": "The clef read is right",
+      "time_section": "Yes, {{time}}, then {{back}} again"
     },
     "compared_one": "Compared with {{count}} other part of the piece.",
     "compared_other": "Compared with the {{count}} other parts of the piece.",
     "byRules_one": "{{count}} answer given by the learned rules.",
     "byRules_other": "{{count}} answers given by the learned rules.",
     "byMemory_one": "{{count}} answer reused from a previous reading.",
-    "byMemory_other": "{{count}} answers reused from a previous reading."
+    "byMemory_other": "{{count}} answers reused from a previous reading.",
+    "clefs": {
+      "treble": "treble clef",
+      "bass": "bass clef",
+      "alto": "alto clef",
+      "tenor": "tenor clef",
+      "other": "other clef"
+    }
   },
   "errors": {
     "unexpected": "An unexpected error occurred. Try again; if it happens again, please report it.",

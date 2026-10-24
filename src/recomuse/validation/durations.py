@@ -5,7 +5,10 @@ Trois cas :
 - plusieurs mesures de suite qui ont TOUTES la même durée fausse : c'est presque sûrement
   un changement de chiffrage manqué (erreur constatée au test de faisabilité : 82 mesures
   fausses dans Green Hill, presque toutes pour cette raison) ; on propose le chiffrage qui
-  correspond à la durée lue ;
+  correspond à la durée lue. Si la mesure qui suit la série a de nouveau la bonne durée,
+  c'est un passage dans un autre chiffrage (un 2/4 au milieu d'un 4/4) : la correction
+  proposée remet aussi l'ancien chiffrage après le passage, sinon les mesures suivantes,
+  justes, deviendraient toutes fausses (erreurs en cascade) ; deux mesures suffisent alors ;
 - une partie sans aucun chiffrage : on propose celui de la durée la plus fréquente.
 Une première mesure plus courte est une levée : elle est normale.
 """
@@ -18,6 +21,8 @@ from recomuse.validation.issues import Fix, Issue
 
 # Nombre minimal de mesures de suite, de même durée fausse, pour conclure à un chiffrage manqué.
 MIN_RUN = 3
+# ... quand la mesure qui suit la série a de nouveau la bonne durée (passage délimité).
+MIN_SECTION_RUN = 2
 
 
 def meter_of(duration: Fraction) -> str:
@@ -88,8 +93,9 @@ def _check_part(part: Part) -> list[Issue]:
                and wrong[end + 1][2] == wrong[start][2]):
             end += 1
         run = wrong[start:end + 1]
-        if len(run) >= MIN_RUN:
-            issues.append(_missed_time(part, run))
+        after = _right_after(measures, run[-1][0])
+        if len(run) >= (MIN_SECTION_RUN if after is not None else MIN_RUN):
+            issues.append(_missed_time(part, run, after))
             used.update(m.id for _, m, _ in run)
         start = end + 1
 
@@ -118,7 +124,30 @@ def _voices(measure: Measure) -> set[int]:
     return {s.value.get("voice", 1) for s in measure.events} or {1}
 
 
-def _missed_time(part: Part, run: list[tuple[int, Measure, Fraction]]) -> Issue:
+def _right_after(measures: list[Measure], index: int) -> Measure | None:
+    """La mesure qui suit `index`, si elle a la durée de son chiffrage (et n'en écrit pas
+    un nouveau) : la série de mesures fausses est alors un passage délimité."""
+    if index + 1 >= len(measures):
+        return None
+    after = measures[index + 1]
+    if (not _checkable(after) or after.expected_duration is None
+            or any(s.kind == "time" for s in after.attributes)):
+        return None
+    return after if after.duration() == Fraction(after.expected_duration) else None
+
+
+def _time_in_force(part: Part, measure: Measure) -> dict | None:
+    """Valeur du chiffrage en vigueur dans la mesure (écrit dans elle, ou avant)."""
+    current = None
+    for m in part.measures:
+        current = next((dict(s.value) for s in m.attributes if s.kind == "time"), current)
+        if m is measure:
+            break
+    return current
+
+
+def _missed_time(part: Part, run: list[tuple[int, Measure, Fraction]],
+                 after: Measure | None = None) -> Issue:
     first = run[0][1]
     duration = run[0][2]
     meter = meter_of(duration)
@@ -130,12 +159,18 @@ def _missed_time(part: Part, run: list[tuple[int, Measure, Fraction]]) -> Issue:
         details={"read_duration": str(duration), "expected": first.expected_duration,
                  "proposed": meter},
     )
+    previous = _time_in_force(part, first)
     existing = next((s for s in first.attributes if s.kind == "time"), None)
     if existing is not None:
         # Le chiffrage est bien lu à cet endroit, mais faux : on propose de le changer.
         issue.fixes.append(Fix(existing.id, {"beats": beats, "beat_type": beat_type}))
     else:
         issue.action = {"insert_time": meter, "before_measure": first.number}
+    if after is not None and previous is not None:
+        # Passage délimité : l'ancien chiffrage revient à la mesure qui suit.
+        issue.action |= {"restore_time": previous, "restore_measure_id": after.id}
+        issue.details |= {"back": f"{previous['beats']}/{previous['beat_type']}",
+                          "last_measure": run[-1][1].number}
     return issue
 
 

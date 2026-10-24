@@ -66,6 +66,10 @@ def issue_signature(model: ScoreModel, issue: Issue) -> dict[str, Any] | None:
     context: dict[str, Any] | None
     if issue.code == "clef_octave_suspicious":
         context = {"octave_change": details.get("octave_change")}
+    elif issue.code == "clef_sign_suspicious":
+        context = {"reason": details.get("reason"), "read": details.get("read"),
+                   "proposed": details.get("proposed"),
+                   "instrument": details.get("instrument")}
     elif issue.code == "note_position_mismatch":
         context = {"place": _place(details.get("position")),
                    "shift": _shift(details.get("read"), details.get("from_position"))}

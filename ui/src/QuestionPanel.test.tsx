@@ -127,6 +127,34 @@ describe('QuestionPanel', () => {
     expect(onFocus).toHaveBeenLastCalledWith('m12', 2)
   })
 
+  it('demande la clé en la nommant, et propose les deux clés', async () => {
+    const clef = {
+      ...restQuestion, key: 'clef', code: 'clef_sign_suspicious',
+      params: { read: 'treble', proposed: 'bass', notes: 24, reason: 'change' },
+      choices: [
+        { id: 'accept', label: 'clef_bass', params: {}, input: null },
+        { id: 'keep', label: 'clef_treble', params: {}, input: null },
+      ],
+    }
+    render(<QuestionPanel api={fakeApi({ get_questions: async () => questionsState([clef]) })} scoreId={1} />)
+    expect(await screen.findByText(
+      /lue comme une clé de sol, alors que la partie était en clé de fa jusqu'ici.*les 24 notes/,
+    )).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Une clé de fa' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Une clé de sol' })).toBeInTheDocument()
+  })
+
+  it('propose un passage dans un autre chiffrage, avec le retour au chiffrage d’avant', async () => {
+    const section = {
+      ...restQuestion, key: 'time', code: 'time_signature_missed',
+      params: { time: '2/4', back: '4/4', first: 12, last: 13, measures: 2 },
+      choices: [{ id: 'accept', label: 'time_section', params: { time: '2/4', back: '4/4' }, input: null }],
+    }
+    render(<QuestionPanel api={fakeApi({ get_questions: async () => questionsState([section]) })} scoreId={1} />)
+    expect(await screen.findByText(/Les mesures 12 à 13 .* à 2\/4, avant de revenir à 4\/4/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Oui, 2/4, puis de nouveau 4/4' })).toBeInTheDocument()
+  })
+
   it('parle anglais', async () => {
     await act(() => i18n.changeLanguage('en'))
     const api = fakeApi({ get_questions: async () => questionsState([noteQuestion]) })

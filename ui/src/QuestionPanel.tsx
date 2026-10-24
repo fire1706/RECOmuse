@@ -32,6 +32,14 @@ export function questionTextKey(question: Question): string {
   if (question.code === 'multirest_missed' && !question.params.count) {
     return 'questions.text.multirest_missed_no_count'
   }
+  if (question.code === 'clef_sign_suspicious') {
+    // Deux indices : l'étendue de l'instrument, ou une clé qui change en cours de partie.
+    return `questions.text.clef_sign_suspicious_${String(question.params.reason)}`
+  }
+  if (question.code === 'time_signature_missed' && question.params.back) {
+    // Passage dans un autre chiffrage, qui revient ensuite à l'ancien.
+    return 'questions.text.time_signature_missed_section'
+  }
   return `questions.text.${question.code}`
 }
 
@@ -161,6 +169,11 @@ export default function QuestionPanel({ api, scoreId, onAnswered, onFocus }: Que
   }
 
   const params = formatParams(question.params, language)
+  if (question.code === 'clef_sign_suspicious') {
+    // Noms des clés (« clé de sol »...), traduits.
+    params.read = t(`questions.clefs.${String(question.params.read)}`)
+    params.proposed = t(`questions.clefs.${String(question.params.proposed)}`)
+  }
   const answer = (choice: Choice, value: number | null = null) =>
     send(api.answer_question(scoreId, question.key, choice.id, value))
 

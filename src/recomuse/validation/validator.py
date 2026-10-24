@@ -20,7 +20,7 @@ from recomuse.validation.geometry import PageGeometries
 from recomuse.validation.issues import Issue, ValidationReport
 from recomuse.validation.numbering import NumberReader, check_multirests, check_numbering
 from recomuse.validation.pitches import check_pitches
-from recomuse.validation.ranges import check_ranges
+from recomuse.validation.ranges import check_clef_signs, check_ranges
 
 SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
 
@@ -44,9 +44,11 @@ def validate(model: ScoreModel, read_number: NumberReader | None = None,
               + check_pitches(model, geometries)
               + check_multirests(model, geometries, read_number)
               + check_numbering(model, geometries, read_number))
-    # Une note qu'une clé octaviée suspecte va déjà déplacer n'est pas signalée une
-    # seconde fois comme hors tessiture.
-    covered = {symbol for issue in issues if issue.code == "clef_octave_suspicious"
+    issues += check_clef_signs(model, table)
+    # Une note qu'une clé suspecte (octaviée, ou d'un autre signe) va déjà déplacer n'est
+    # pas signalée une seconde fois comme hors tessiture.
+    covered = {symbol for issue in issues
+               if issue.code in ("clef_octave_suspicious", "clef_sign_suspicious")
                for symbol in issue.symbol_ids}
     issues += [i for i in check_ranges(model, table) if not covered & set(i.symbol_ids)]
     issues.sort(key=lambda i: (SEVERITY_ORDER[i.severity], i.part_id,

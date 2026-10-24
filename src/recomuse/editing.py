@@ -22,12 +22,17 @@ from recomuse.learning.corrections import CorrectionError, CorrectionService, Ne
 from recomuse.learning.journal import CorrectionJournal
 from recomuse.model.score import Measure, Part, ScoreModel, Symbol, fraction_text
 from recomuse.model.store import load_model
-from recomuse.vector.pitch import degree, from_degree, key_alter
+from recomuse.vector.pitch import (
+    clef_bottom_line,
+    degree,
+    from_degree,
+    key_alter,
+    moved_by_clef,
+)
 
 # Durées écrites proposées (en noires) : ronde, blanche, noire, croche, double, triple.
 WRITTEN_DURATIONS = ("4", "2", "1", "1/2", "1/4", "1/8")
 # Note de référence de chaque clé (sur la ligne de la clé) : sol, fa, ut.
-CLEF_REFERENCE = {"G": ("G", 4), "F": ("F", 3), "C": ("C", 4)}
 
 
 class EditError(ValueError):
@@ -253,11 +258,7 @@ def _clef(model: ScoreModel, edit: dict) -> Result:
         for note in _notes_until(part, measure, "clef"):
             if not note.value.get("step"):
                 continue
-            step, octave = from_degree(degree(note.value["step"], note.value["octave"]) + shift)
-            alter = note.value.get("alter") or 0
-            if alter == key_alter(fifths, note.value["step"]):
-                alter = key_alter(fifths, step)   # suivait l'armure : la suit encore
-            changes.append((note.id, {"step": step, "octave": octave, "alter": alter}))
+            changes.append((note.id, moved_by_clef(note.value, shift, fifths)))
     return changes, additions, removals, measure_id, selected
 
 
@@ -342,9 +343,7 @@ def _notes_until(part: Part, measure: Measure, kind: str):
 
 def _bottom_line(clef: dict) -> int:
     """Degré (voir vector.pitch) de la note sur la ligne du bas avec cette clé."""
-    step, octave = CLEF_REFERENCE.get(clef.get("sign"), ("G", 4))
-    line = clef.get("line") or 2
-    return degree(step, octave) - 2 * (line - 1) + 7 * (clef.get("octave_change") or 0)
+    return clef_bottom_line(clef)
 
 
 def _written(symbol: Symbol) -> Fraction:

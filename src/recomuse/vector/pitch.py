@@ -46,6 +46,29 @@ def pitch_at(clef: str, clef_position: int, position: int) -> tuple[str, int]:
     return from_degree(degree(step, octave) + position - clef_position)
 
 
+def clef_bottom_line(clef: dict) -> int:
+    """Degré de la note sur la ligne du bas de la portée, pour une clé du modèle
+    ({"sign": "G", "line": 2, "octave_change": 0}) : mi4 en clé de sol, sol2 en clé de fa."""
+    step, octave = MODEL_CLEF_REFERENCE.get(clef.get("sign"), ("G", 4))
+    line = clef.get("line") or 2
+    return degree(step, octave) - 2 * (line - 1) + 7 * (clef.get("octave_change") or 0)
+
+
+def moved_by_clef(value: dict, shift: int, fifths: int) -> dict:
+    """Note qui garde sa place sur la portée quand la clé change de `shift` degrés : son
+    nouveau nom et son octave. Une note qui suivait l'armure la suit encore (si♭ en sol
+    avec 3 bémols → ré en fa... qui prend le bémol de l'armure s'il en a un)."""
+    step, octave = from_degree(degree(value["step"], value["octave"]) + shift)
+    alter = value.get("alter") or 0
+    if alter == key_alter(fifths, value["step"]):
+        alter = key_alter(fifths, step)
+    return {"step": step, "octave": octave, "alter": alter}
+
+
+# Clés du modèle (signe MusicXML) → note de référence, sur la ligne de la clé.
+MODEL_CLEF_REFERENCE: dict[str, tuple[str, int]] = {"G": ("G", 4), "F": ("F", 3), "C": ("C", 4)}
+
+
 def key_alter(fifths: int, step: str) -> int:
     """Altération apportée par l'armure : `fifths` > 0 = nombre de dièses, < 0 = de bémols."""
     if fifths > 0 and step in SHARP_ORDER[:fifths]:
