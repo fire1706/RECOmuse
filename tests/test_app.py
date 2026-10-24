@@ -26,7 +26,8 @@ def test_api_hides_private_attributes(conn):
     """pywebview n'expose que les noms publics : la connexion à la base doit rester privée."""
     public = [name for name in dir(Api(conn, "")) if not name.startswith("_")]
     assert sorted(public) == ["answer_question", "check_transposition", "choose_file",
-                              "edit_score", "get_app_info", "get_instruments", "get_measure",
+                              "choose_save_path", "edit_score", "export_score", "get_app_info",
+                              "get_export_options", "get_instruments", "get_measure",
                               "get_page", "get_progress", "get_questions", "get_rendering",
                               "get_score_instrument", "list_scores", "open_file", "ping",
                               "set_score_instrument", "transpose_score", "undo_answer",

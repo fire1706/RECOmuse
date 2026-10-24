@@ -36,10 +36,14 @@ Transposition : « Transposer… » réécrit la partie pour un autre instrument
 une partie de trombone en clé de fa pour un baryton en si♭ en clé de sol) ou d'un
 intervalle, et crée une nouvelle partition ; la table des instruments est le fichier
 `src/recomuse/instruments/instruments.json`.
+Export : « Exporter… » enregistre la partition pour MuseScore (.mscz, par MuseScore 4 en
+ligne de commande ; un MusicXML à la place s'il est absent), en MusicXML, ou en MIDI joué à
+la hauteur réelle de l'instrument. MuseScore peut être indiqué par la variable
+`RECOMUSE_MUSESCORE`.
 
 Tests : `.venv\Scripts\python -m pytest` à la racine, `npm test` dans `ui/`.
 Tests lents, sur demande : `-m corpus` (vraies partitions de `tests/corpus/` ou `test/corpus/`)
-et `-m external` (vrais Audiveris et Tesseract).
+et `-m external` (vrais Audiveris, Tesseract et MuseScore).
 
 ### Programmes externes (reconnaissance)
 

@@ -107,6 +107,7 @@ class Instrument:
     ranges: dict[str, tuple[int, int]] = field(default_factory=dict)
     label: dict[str, str] = field(default_factory=dict)       # nom affiché, par langue
     variants: tuple[Variant, ...] = ()
+    midi_program: int = 1        # son General MIDI (1 = piano, 57 = trompette...)
 
     def variant(self, variant_id: str | None) -> Variant | None:
         return next((v for v in self.variants if v.id == variant_id), None)
@@ -175,6 +176,7 @@ def load_table(path: Path | None = None) -> InstrumentTable:
                    ranges={sign: (parse_note(low), parse_note(high))
                            for sign, (low, high) in item["ranges"].items()},
                    label=dict(item.get("label") or {}),
+                   midi_program=int(item.get("midi", 1)),
                    variants=tuple(
                        Variant(id=v["id"], key=v.get("key"), clef=v["clef"],
                                transpose=Interval.parse(v["transpose"])

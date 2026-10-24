@@ -15,6 +15,7 @@ import MeasureEditor from './MeasureEditor'
 import QuestionPanel from './QuestionPanel'
 import ScanView from './ScanView'
 import ScoreView from './ScoreView'
+import ExportDialog from './ExportDialog'
 import TransposeDialog from './TransposeDialog'
 import './App.css'
 
@@ -69,6 +70,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
   // Change après une modification manuelle : les questions sont recalculées.
   const [editVersion, setEditVersion] = useState(0)
   const [transposing, setTransposing] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const poll = useRef<number | null>(null)
 
   useEffect(() => {
@@ -183,6 +185,11 @@ export default function App({ connect = waitForBridge }: AppProps) {
               {t('transpose.button')}
             </button>
           )}
+          {scoreId !== null && (
+            <button type="button" onClick={() => setExporting(true)} disabled={!connected || reading !== null}>
+              {t('export.button')}
+            </button>
+          )}
           {scores.length > 0 && (
             <label className="score-picker">
               {t('scores.label')}
@@ -271,6 +278,10 @@ export default function App({ connect = waitForBridge }: AppProps) {
             setTransposing(false)
             chooseScore(score.score_id, known)
           }} />
+      )}
+
+      {exporting && engine.kind === 'connected' && scoreId !== null && (
+        <ExportDialog api={engine.api} scoreId={scoreId} onClose={() => setExporting(false)} />
       )}
 
       <footer className="status-bar" role="status">

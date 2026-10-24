@@ -110,7 +110,9 @@
     "score_not_found": "This score cannot be found.",
     "rendering_failed": "The score could not be drawn.",
     "edit_failed": "This change could not be made.",
-    "transposition_failed": "This transposition could not be made."
+    "transposition_failed": "This transposition could not be made.",
+    "write_failed": "The file could not be written (protected folder, disk full?).",
+    "unknown_format": "Unknown export format."
   },
   "scan": {
     "loading": "Loading the page…",
@@ -261,5 +263,47 @@
       "percussion": "percussion clef",
       "other": "other clef"
     }
+  },
+  "export": {
+    "button": "Export…",
+    "title": "Export the score",
+    "loading": "Preparing…",
+    "format": "Format",
+    "formats": {
+      "musescore": "MuseScore (.mscz)",
+      "musicxml": "MusicXML",
+      "midi": "MIDI"
+    },
+    "descriptions": {
+      "musescore": "to open, correct and print in MuseScore (advised)",
+      "musicxml": "for MuseScore, Finale, Sibelius, Dorico and other notation software",
+      "midi": "to listen to the part, played at the instrument's real pitch"
+    },
+    "filters": {
+      "musescore": "MuseScore score",
+      "musicxml": "MusicXML score",
+      "midi": "MIDI file"
+    },
+    "noMusescore": "MuseScore is not installed on this computer: a MusicXML file will be written instead (MuseScore can open it later).",
+    "pending": "Warning: there are still {{questions}} and {{checks}}. The file will contain the errors that have not been corrected yet.",
+    "questions_zero": "no questions",
+    "questions_one": "{{count}} unanswered question",
+    "questions_other": "{{count}} unanswered questions",
+    "checks_zero": "no spots to check",
+    "checks_one": "{{count}} spot to check",
+    "checks_other": "{{count}} spots to check",
+    "writing": {
+      "musescore": "MuseScore is writing the file… (a few seconds)",
+      "musicxml": "Writing the file…",
+      "midi": "Writing the file…"
+    },
+    "saved": "Saved: {{path}}",
+    "fallback": {
+      "musescore_not_found": "MuseScore cannot be found: the score was saved as MusicXML.",
+      "musescore_failed": "MuseScore could not write the file: the score was saved as MusicXML.",
+      "musescore_timeout": "MuseScore took too long: the score was saved as MusicXML."
+    },
+    "save": "Save…",
+    "close": "Close"
   }
 }

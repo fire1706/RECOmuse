@@ -25,6 +25,8 @@ import threading
 from pathlib import Path
 
 from recomuse import __version__, editing, library
+from recomuse.export import files as exports
+from recomuse.export.musescore import find_musescore
 from recomuse.importer import ScoreImportError
 from recomuse.importer.loading import IMAGE_EXTENSIONS
 from recomuse.instruments import parts as instruments
@@ -183,6 +185,39 @@ class Api:
         """Crée la partition transposée : {"score": résumé, "report": compte rendu}."""
         return self._guarded(lambda: instruments.transpose_score(self._conn, score_id, request))
 
+    # --- Exports --------------------------------------------------------------------------
+
+    def get_export_options(self, score_id: int) -> dict:
+        """Ce que l'interface montre avant d'exporter : nom de fichier proposé, MuseScore
+        présent ou non, doutes encore ouverts (questions et passages à vérifier)."""
+        def options():
+            model = load_model(self._conn, score_id)
+            if model is None:
+                raise exports.ExportError("score_not_found")
+            state = self._questions.state(score_id)
+            return {"default_name": exports.default_name(model),
+                    "musescore": find_musescore() is not None,
+                    "questions": len(state["questions"]), "checks": state["unasked"]}
+        return self._guarded(options)
+
+    def choose_save_path(self, filter_label: str, default_name: str, fmt: str) -> str | None:
+        """Fenêtre « Enregistrer sous » du système ; renvoie le fichier choisi (ou None)."""
+        if self._window is None or fmt not in exports.FORMATS:
+            return None
+        import webview
+
+        extension = exports.FORMATS[fmt]
+        chosen = self._window.create_file_dialog(
+            webview.FileDialog.SAVE, save_filename=default_name + extension,
+            file_types=(f"{filter_label} (*{extension})",))
+        if not chosen:
+            return None
+        return str(chosen[0] if isinstance(chosen, list | tuple) else chosen)
+
+    def export_score(self, score_id: int, fmt: str, path: str) -> dict:
+        """Écrit la partition : {"path", "format", "fallback"} (voir export.files)."""
+        return self._guarded(lambda: exports.export_score(self._conn, score_id, fmt, path))
+
     # --- Questions ------------------------------------------------------------------------
 
     def get_questions(self, score_id: int) -> dict:
@@ -218,6 +253,12 @@ class Api:
         except instruments.TranspositionError:
             log.exception("Transposition impossible")
             return {"error": "transposition_failed"}
+        except exports.ExportError as error:
+            log.exception("Export impossible")
+            return {"error": error.code}
+        except OSError:
+            log.exception("Fichier impossible à écrire")
+            return {"error": "write_failed"}
         except Exception:
             log.exception("Erreur inattendue")
             return {"error": "unexpected"}

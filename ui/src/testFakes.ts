@@ -73,6 +73,9 @@ export function fakeApi(overrides: Partial<PythonApi> = {}, info: AppInfo = fake
     set_score_instrument: async () => ({ error: 'transposition_failed' }),
     check_transposition: async () => ({ error: 'transposition_failed' }),
     transpose_score: async () => ({ error: 'transposition_failed' }),
+    get_export_options: async () => ({ default_name: 'Partition', musescore: true, questions: 0, checks: 0 }),
+    choose_save_path: async () => null,
+    export_score: async () => ({ error: 'write_failed' }),
     ...overrides,
   }
 }

@@ -38,11 +38,11 @@ where = ["src"]
 testpaths = ["tests"]
 # Tests lents, lancés seulement sur demande :
 #   pytest -m corpus    (vraies partitions du corpus local)
-#   pytest -m external  (vrais Audiveris et Tesseract)
+#   pytest -m external  (vrais Audiveris, Tesseract et MuseScore)
 addopts = "-ra -m 'not corpus and not external'"
 markers = [
     "corpus: tests sur les vraies partitions du corpus local (lecture seule)",
-    "external: tests qui lancent les vrais Audiveris et Tesseract",
+    "external: tests qui lancent les vrais Audiveris, Tesseract et MuseScore",
 ]
 
 [tool.ruff]

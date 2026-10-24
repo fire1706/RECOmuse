@@ -110,7 +110,9 @@
     "score_not_found": "Cette partition est introuvable.",
     "rendering_failed": "La partition n'a pas pu être dessinée.",
     "edit_failed": "Cette modification n'a pas pu être faite.",
-    "transposition_failed": "Cette transposition n'a pas pu être faite."
+    "transposition_failed": "Cette transposition n'a pas pu être faite.",
+    "write_failed": "Le fichier n'a pas pu être écrit (dossier protégé, disque plein ?).",
+    "unknown_format": "Format d'export inconnu."
   },
   "scan": {
     "loading": "Chargement de la page…",
@@ -261,5 +263,47 @@
       "percussion": "clé de percussion",
       "other": "autre clé"
     }
+  },
+  "export": {
+    "button": "Exporter…",
+    "title": "Exporter la partition",
+    "loading": "Préparation…",
+    "format": "Format",
+    "formats": {
+      "musescore": "MuseScore (.mscz)",
+      "musicxml": "MusicXML",
+      "midi": "MIDI"
+    },
+    "descriptions": {
+      "musescore": "à ouvrir, corriger et imprimer dans MuseScore (conseillé)",
+      "musicxml": "pour MuseScore, Finale, Sibelius, Dorico et les autres logiciels de partitions",
+      "midi": "pour écouter la partie, jouée à la hauteur réelle de l'instrument"
+    },
+    "filters": {
+      "musescore": "Partition MuseScore",
+      "musicxml": "Partition MusicXML",
+      "midi": "Fichier MIDI"
+    },
+    "noMusescore": "MuseScore n'est pas installé sur cet ordinateur : un fichier MusicXML sera écrit à la place (MuseScore l'ouvrira plus tard).",
+    "pending": "Attention : il reste {{questions}} et {{checks}}. Le fichier contiendra les erreurs qui n'ont pas encore été corrigées.",
+    "questions_zero": "aucune question",
+    "questions_one": "{{count}} question sans réponse",
+    "questions_other": "{{count}} questions sans réponse",
+    "checks_zero": "aucun passage à vérifier",
+    "checks_one": "{{count}} passage à vérifier",
+    "checks_other": "{{count}} passages à vérifier",
+    "writing": {
+      "musescore": "MuseScore écrit le fichier… (quelques secondes)",
+      "musicxml": "Écriture du fichier…",
+      "midi": "Écriture du fichier…"
+    },
+    "saved": "Enregistré : {{path}}",
+    "fallback": {
+      "musescore_not_found": "MuseScore est introuvable : la partition a été enregistrée en MusicXML.",
+      "musescore_failed": "MuseScore n'a pas réussi à écrire le fichier : la partition a été enregistrée en MusicXML.",
+      "musescore_timeout": "MuseScore a mis trop de temps : la partition a été enregistrée en MusicXML."
+    },
+    "save": "Enregistrer…",
+    "close": "Fermer"
   }
 }

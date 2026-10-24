@@ -178,6 +178,24 @@ export interface TranspositionReport {
   suggested_octave: number
 }
 
+/** Formats d'export proposés. */
+export type ExportFormat = 'musescore' | 'musicxml' | 'midi'
+
+/** Avant d'exporter : nom proposé, MuseScore présent, doutes encore ouverts. */
+export interface ExportOptions {
+  default_name: string
+  musescore: boolean
+  questions: number
+  checks: number
+}
+
+/** Fichier écrit ; fallback : raison d'un MusicXML écrit à la place du MuseScore. */
+export interface ExportResult {
+  path: string
+  format: ExportFormat
+  fallback: string | null
+}
+
 /** Erreur renvoyée par le moteur : un code traduit par errors.<code>. */
 export interface EngineError {
   error: string
@@ -214,6 +232,9 @@ export interface PythonApi {
     scoreId: number,
     request: TranspositionRequest,
   ): Promise<{ score: ScoreSummary; report: TranspositionReport } | EngineError>
+  get_export_options(scoreId: number): Promise<ExportOptions | EngineError>
+  choose_save_path(filterLabel: string, defaultName: string, format: ExportFormat): Promise<string | null>
+  export_score(scoreId: number, format: ExportFormat, path: string): Promise<ExportResult | EngineError>
 }
 
 /** Vrai si la réponse du moteur est une erreur. */
