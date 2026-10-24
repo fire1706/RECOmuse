@@ -139,10 +139,20 @@ export default function QuestionPanel({ api, scoreId, onAnswered, onFocus }: Que
     </details>
   )
 
+  // Réponses données sans poser de question : règles apprises, lecture précédente.
+  const byOthers = (state.answered_by_rules > 0 || state.answered_by_memory > 0) && (
+    <p className="question-note">
+      {state.answered_by_rules > 0 && t('questions.byRules', { count: state.answered_by_rules })}
+      {state.answered_by_rules > 0 && state.answered_by_memory > 0 && ' '}
+      {state.answered_by_memory > 0 && t('questions.byMemory', { count: state.answered_by_memory })}
+    </p>
+  )
+
   if (!question) {
     return (
       <div className="questions-done">
         <p>{t('questions.done')}</p>
+        {byOthers}
         {state.unasked > 0 && <p className="empty">{t('questions.unasked', { count: state.unasked })}</p>}
         {checks}
         {undoButton}
@@ -161,6 +171,7 @@ export default function QuestionPanel({ api, scoreId, onAnswered, onFocus }: Que
         {state.answered > 0 && ` · ${t('questions.answered', { count: state.answered })}`}
         {state.compared_parts > 0 && ` · ${t('questions.compared', { count: state.compared_parts })}`}
       </p>
+      {byOthers}
       <p className="question-where">
         {t('questions.where', {
           measure: question.measure_numbers.slice(0, 3).join(', '),

@@ -48,7 +48,7 @@ export const noteQuestion: Question = {
 }
 
 export function questionsState(questions: Question[], extra: Partial<QuestionsState> = {}): QuestionsState {
-  return { score_id: 1, questions, unasked: 0, checks: [], compared_parts: 0, answered: 0, can_undo: false, ...extra }
+  return { score_id: 1, questions, unasked: 0, checks: [], compared_parts: 0, answered: 0, answered_by_rules: 0, answered_by_memory: 0, can_undo: false, ...extra }
 }
 
 /** Faux pont : chaque méthode peut être remplacée par le test. */
@@ -76,6 +76,8 @@ export function fakeApi(overrides: Partial<PythonApi> = {}, info: AppInfo = fake
     get_export_options: async () => ({ default_name: 'Partition', musescore: true, questions: 0, checks: 0 }),
     choose_save_path: async () => null,
     export_score: async () => ({ error: 'write_failed' }),
+    get_rules: async () => [],
+    set_rule_enabled: async () => ({ rules: [] }),
     ...overrides,
   }
 }

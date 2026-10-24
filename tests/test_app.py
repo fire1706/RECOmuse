@@ -29,7 +29,8 @@ def test_api_hides_private_attributes(conn):
                               "choose_save_path", "edit_score", "export_score", "get_app_info",
                               "get_export_options", "get_instruments", "get_measure",
                               "get_page", "get_progress", "get_questions", "get_rendering",
-                              "get_score_instrument", "list_scores", "open_file", "ping",
+                              "get_rules", "get_score_instrument", "list_scores",
+                              "open_file", "ping", "set_rule_enabled",
                               "set_score_instrument", "transpose_score", "undo_answer",
                               "undo_edit"]
 

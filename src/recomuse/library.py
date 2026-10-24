@@ -5,6 +5,8 @@ import (pages préparées à 300 dpi) → reconnaissance (lecture vectorielle, A
 textes) → modèle interne → séparation des parties (un PDF peut les contenir toutes).
 Chaque partie devient une partition de la base, avec son modèle. Les parties d'un même
 morceau (même titre) sont comparées entre elles pour poser les questions (piece_of).
+Une partie déjà lue et corrigée (mêmes pages : learning/memory.py) reprend ses
+corrections et ses réponses aux questions.
 
 C'est long (une ou deux minutes pour une page scannée) : `progress` est appelé à chaque
 étape, pour que l'interface puisse dire où on en est.
@@ -18,6 +20,8 @@ from pathlib import Path
 from recomuse import paths
 from recomuse.export.mei import model_to_mei
 from recomuse.importer import import_score, register_score
+from recomuse.learning import memory
+from recomuse.learning.corrections import CorrectionService
 from recomuse.model.build import build_model
 from recomuse.model.score import ScoreModel
 from recomuse.model.split import normalized, split_parts
@@ -52,10 +56,22 @@ def open_file(conn: sqlite3.Connection, source: Path | str,
     parts = split_parts(model, recognition.page_headers)
 
     summaries = []
+    created: set[int] = set()
     for part in parts:
         score_id = register_score(conn, score, title=part.title, part_name=part.instrument)
+        created.add(score_id)
         save_model(conn, score_id, part)
-        summaries.append(summary(score_id, part))
+        # Partition déjà lue et corrigée ? Ses corrections sont reprises.
+        prints = memory.page_fingerprints(part)
+        previous = memory.find_previous(conn, prints, exclude=created)
+        memory.store(conn, score_id, prints)
+        result = summary(score_id, part)
+        if previous is not None:
+            replayed = memory.replay(conn, CorrectionService(conn), previous, score_id)
+            replayed["read_at"] = conn.execute(
+                "SELECT imported_at FROM scores WHERE id = ?", (previous,)).fetchone()[0]
+            result = summary(score_id, load_model(conn, score_id)) | {"memory": replayed}
+        summaries.append(result)
     report("done")
     return summaries
 

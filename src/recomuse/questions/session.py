@@ -8,7 +8,10 @@ Les questions déjà répondues ne sont plus posées, même si la réponse étai
 juste » (table question_answers).
 
 Toutes les corrections passent par le service de corrections (learning/corrections.py).
-Les règles apprises (tâche 12) seront consultées ici avant de poser une question.
+Avant de poser une question, les règles apprises sont consultées (learning/rules.py) :
+si l'utilisateur a toujours répondu de la même façon à des questions semblables, la
+réponse est donnée sans lui demander (source « rule »). Il peut l'annuler comme ses
+propres réponses ; la question lui est alors posée.
 """
 
 import hashlib
@@ -18,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from recomuse import library, paths
+from recomuse.learning import rules
 from recomuse.learning.corrections import CorrectionService
 from recomuse.model.score import ScoreModel
 from recomuse.model.store import load_model
@@ -27,6 +31,9 @@ from recomuse.validation.comparison import compare_parts, part_refs
 from recomuse.validation.geometry import PageGeometries
 from recomuse.validation.issues import Issue, ValidationReport
 from recomuse.validation.validator import tesseract_number_reader, validate
+
+# Nombre maximal de réponses données d'un coup par les règles apprises (garde-fou).
+MAX_RULE_ANSWERS = 200
 
 
 class QuestionError(RuntimeError):
@@ -64,6 +71,8 @@ class QuestionSession:
                 "checks": check_items(model, unasked),
                 "compared_parts": self._compared.get(score_id, 0),
                 "answered": self._answer_count(score_id),
+                "answered_by_rules": self._answer_count(score_id, "rule"),
+                "answered_by_memory": self._answer_count(score_id, "memory"),
                 "can_undo": self._last_answer(score_id) is not None}
 
     def answer(self, score_id: int, key: str, choice_id: str, value: Any = None) -> dict:
@@ -81,17 +90,7 @@ class QuestionSession:
         except (KeyError, ValueError) as error:
             raise QuestionError(f"Réponse impossible : {error}") from None
 
-        ids: list[int] = []
-        if fixes or additions:
-            ids = self._service.apply_group(
-                score_id, [(f.symbol_id, f.value) for f in fixes], source="question",
-                reason=question.code, additions=additions)
-        with self._conn:
-            self._conn.execute(
-                "INSERT INTO question_answers (score_id, question_key, code, choice_id, value,"
-                " correction_ids) VALUES (?, ?, ?, ?, ?, ?)",
-                (score_id, key, question.code, choice_id,
-                 json.dumps(value) if value is not None else None, json.dumps(ids)))
+        self._record(score_id, question, choice, value, fixes, additions, "user")
         return self.state(score_id)
 
     def undo(self, score_id: int) -> dict:
@@ -118,6 +117,18 @@ class QuestionSession:
 
     def _questions(self, score_id: int,
                    model: ScoreModel) -> tuple[list[Question], list[Issue]]:
+        """Questions à poser, après avoir laissé les règles apprises répondre à celles
+        qu'elles connaissent (une à la fois : chaque réponse change la partition, et donc
+        les doutes suivants)."""
+        for _ in range(MAX_RULE_ANSWERS):
+            questions, unasked = self._open_questions(score_id, model)
+            if not self._apply_one_rule(score_id, questions):
+                break
+            model = self._model(score_id)
+        return questions, unasked
+
+    def _open_questions(self, score_id: int,
+                        model: ScoreModel) -> tuple[list[Question], list[Issue]]:
         report = validate(model, read_number=self._number_reader(),
                           geometries=self._page_images(score_id))
         report = ValidationReport(report.issues + self._comparison(score_id, model))
@@ -126,6 +137,50 @@ class QuestionSession:
         questions = [q for q in questions if q.key not in answered]
         self._current[score_id] = {q.key: q for q in questions}
         return questions, unasked
+
+    def _apply_one_rule(self, score_id: int, questions: list[Question]) -> bool:
+        """Répond à la première question qu'une règle activée connaît. Vrai si une
+        réponse a été donnée. Une question dont l'utilisateur a annulé la réponse donnée
+        par une règle lui est posée à lui."""
+        known = {r.key: r for r in rules.learned_rules(self._conn) if r.enabled}
+        if not known:
+            return False
+        refused = {row[0] for row in self._conn.execute(
+            "SELECT question_key FROM question_answers WHERE score_id = ? AND undone = 1"
+            " AND answered_by = 'rule'", (score_id,))}
+        for question in questions:
+            if question.signature is None or question.key in refused:
+                continue
+            rule = known.get(rules.signature_key(question.signature))
+            choice = next((c for c in question.choices if rule and c.id == rule.choice_id),
+                          None)
+            if choice is None or choice.input is not None:
+                continue
+            fixes, additions = choice.changes()
+            self._record(score_id, question, choice, None, fixes, additions, "rule")
+            return True
+        return False
+
+    def _record(self, score_id: int, question: Question, choice, value: Any, fixes,
+                additions, answered_by: str) -> None:
+        """Applique les corrections d'une réponse et l'enregistre, avec la signature de
+        la question (pour les règles apprises)."""
+        ids: list[int] = []
+        if fixes or additions:
+            ids = self._service.apply_group(
+                score_id, [(f.symbol_id, f.value) for f in fixes],
+                source="question" if answered_by == "user" else "rule",
+                reason=question.code if answered_by == "user" else f"rule:{question.code}",
+                additions=additions)
+        signature = rules.signature_key(question.signature) if question.signature else None
+        with self._conn:
+            self._conn.execute(
+                "INSERT INTO question_answers (score_id, question_key, code, choice_id, value,"
+                " correction_ids, signature, choice_label, answered_by)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (score_id, question.key, question.code, choice.id,
+                 json.dumps(value) if value is not None else None, json.dumps(ids),
+                 signature, choice.label, answered_by))
 
     def _comparison(self, score_id: int, model: ScoreModel) -> list[Issue]:
         """Problèmes de cette partition trouvés en la comparant aux autres parties du
@@ -183,10 +238,12 @@ class QuestionSession:
             (score_id,))
         return {row[0] for row in rows}
 
-    def _answer_count(self, score_id: int) -> int:
-        return self._conn.execute(
-            "SELECT COUNT(*) FROM question_answers WHERE score_id = ? AND undone = 0",
-            (score_id,)).fetchone()[0]
+    def _answer_count(self, score_id: int, answered_by: str | None = None) -> int:
+        sql = "SELECT COUNT(*) FROM question_answers WHERE score_id = ? AND undone = 0"
+        if answered_by is None:
+            return self._conn.execute(sql, (score_id,)).fetchone()[0]
+        return self._conn.execute(sql + " AND answered_by = ?",
+                                  (score_id, answered_by)).fetchone()[0]
 
     def _last_answer(self, score_id: int) -> tuple[int, list[int]] | None:
         row = self._conn.execute(

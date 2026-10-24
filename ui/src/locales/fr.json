@@ -90,7 +90,11 @@
       "time_as_read": "Non, {{time}}, comme lu"
     },
     "compared_one": "Comparée à {{count}} autre partie du morceau.",
-    "compared_other": "Comparée aux {{count}} autres parties du morceau."
+    "compared_other": "Comparée aux {{count}} autres parties du morceau.",
+    "byRules_one": "{{count}} réponse donnée par les règles apprises.",
+    "byRules_other": "{{count}} réponses données par les règles apprises.",
+    "byMemory_one": "{{count}} réponse reprise d'une lecture précédente.",
+    "byMemory_other": "{{count}} réponses reprises d'une lecture précédente."
   },
   "errors": {
     "unexpected": "Une erreur inattendue s'est produite. Réessayez ; si elle revient, signalez-la.",
@@ -305,5 +309,88 @@
     },
     "save": "Enregistrer…",
     "close": "Fermer"
+  },
+  "rules": {
+    "button": "Règles apprises",
+    "title": "Règles apprises",
+    "loading": "Chargement…",
+    "close": "Fermer",
+    "explanation": "Quand vous avez répondu au moins 3 fois de la même façon à des questions semblables, sur au moins 2 partitions, RECOmuse donne ensuite cette réponse lui-même. Décochez une règle pour que la question vous soit de nouveau posée. « Annuler ma dernière réponse » défait aussi une réponse donnée par une règle.",
+    "none": "Aucune règle pour l'instant : elles viendront au fil de vos réponses.",
+    "evidence_one": "{{agreeing}} réponse identique sur {{count}}",
+    "evidence_other": "{{agreeing}} réponses identiques sur {{count}}",
+    "contexts": {
+      "clef_octave_suspicious": "Clé lue avec un petit 8",
+      "note_position_mismatch": "Note lue {{shift}} de sa position sur la portée ({{place}})",
+      "note_out_of_range": "Notes trop {{direction}} pour l'instrument « {{instrument}} »",
+      "time_signature_missed": "Mesures qui ne correspondent pas au chiffrage",
+      "time_signature_missing": "Aucun chiffrage lu au début de la partie",
+      "multirest_missed": "Silence lu comme une seule mesure ({{count_read}})",
+      "measure_number_mismatch": "Numéros de mesure imprimés qui sautent",
+      "part_measures_missing": "Mesures en moins par rapport aux autres parties",
+      "part_measures_extra": "Mesures en trop par rapport aux autres parties",
+      "part_time_signature_differs": "Chiffrage différent de celui des autres parties",
+      "other": "Doute « {{code}} »"
+    },
+    "values": {
+      "shift": {
+        "octave": "une octave à côté",
+        "other": "autrement"
+      },
+      "place": {
+        "above": "au-dessus de la portée",
+        "below": "sous la portée",
+        "inside": "dans la portée",
+        "unknown": "position inconnue"
+      },
+      "direction": {
+        "high": "aiguës",
+        "low": "graves"
+      },
+      "count_read": {
+        "true": "nombre lu au-dessus",
+        "false": "nombre non lu"
+      }
+    },
+    "answers": {
+      "default": {
+        "accept": "accepter la correction proposée",
+        "keep": "garder ce qui a été lu"
+      },
+      "clef_octave_suspicious": {
+        "accept": "clé normale, sans 8",
+        "keep": "garder la clé avec un 8"
+      },
+      "note_position_mismatch": {
+        "accept": "prendre la note d'après sa position",
+        "keep": "garder la note lue"
+      },
+      "note_out_of_range": {
+        "accept": "déplacer les notes d'une octave",
+        "keep": "garder les notes"
+      },
+      "time_signature_missed": {
+        "accept": "changer de chiffrage",
+        "keep": "garder le chiffrage"
+      },
+      "time_signature_missing": {
+        "accept": "ajouter le chiffrage proposé"
+      },
+      "multirest_missed": {
+        "accept": "en faire une pause de plusieurs mesures",
+        "keep": "garder une seule mesure"
+      }
+    }
+  },
+  "memory": {
+    "replayed": "{{name}} : déjà lue le {{date}} ; {{corrections}} et {{answers}} reprises.",
+    "corrections_zero": "aucune correction",
+    "corrections_one": "{{count}} correction",
+    "corrections_other": "{{count}} corrections",
+    "answers_zero": "aucune réponse",
+    "answers_one": "{{count}} réponse",
+    "answers_other": "{{count}} réponses",
+    "skipped_one": "({{count}} correction ne s'appliquait plus.)",
+    "skipped_other": "({{count}} corrections ne s'appliquaient plus.)"
   }
 }

@@ -13,6 +13,7 @@ import { type AppInfo, isError, type PythonApi, type ScoreSummary, waitForBridge
 import { SUPPORTED_LANGUAGES } from './i18n'
 import MeasureEditor from './MeasureEditor'
 import QuestionPanel from './QuestionPanel'
+import RulesDialog from './RulesDialog'
 import ScanView from './ScanView'
 import ScoreView from './ScoreView'
 import ExportDialog from './ExportDialog'
@@ -61,6 +62,8 @@ export default function App({ connect = waitForBridge }: AppProps) {
   const [reading, setReading] = useState<string | null>(null) // étape de la lecture en cours
   const [openError, setOpenError] = useState<string | null>(null)
   const [openedParts, setOpenedParts] = useState<number | null>(null)
+  // Parties déjà lues et corrigées : ce qui a été repris à l'ouverture.
+  const [remembered, setRemembered] = useState<ScoreSummary[]>([])
   // Vue côte à côte : page montrée à gauche, mesure choisie, et un compteur qui change à
   // chaque correction (les deux vues se redessinent alors).
   const [page, setPage] = useState<number | null>(null)
@@ -71,6 +74,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
   const [editVersion, setEditVersion] = useState(0)
   const [transposing, setTransposing] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [showRules, setShowRules] = useState(false)
   const poll = useRef<number | null>(null)
 
   useEffect(() => {
@@ -143,6 +147,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
     if (!path) return
     setOpenError(null)
     setOpenedParts(null)
+    setRemembered([])
     setReading('import')
     poll.current = window.setInterval(async () => {
       const { stage } = await api.get_progress()
@@ -157,6 +162,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
         setScores(known)
         chooseScore(result.scores[0]?.score_id ?? null, known)
         setOpenedParts(result.scores.length)
+        setRemembered(result.scores.filter((s) => s.memory))
       }
     } catch {
       setOpenError('unexpected')
@@ -211,6 +217,11 @@ export default function App({ connect = waitForBridge }: AppProps) {
               </select>
             </label>
           )}
+          {connected && (
+            <button type="button" onClick={() => setShowRules(true)}>
+              {t('rules.button')}
+            </button>
+          )}
           <label className="language-picker">
             {t('language.label')}
             <select value={i18n.resolvedLanguage} onChange={(e) => i18n.changeLanguage(e.target.value)}>
@@ -244,6 +255,17 @@ export default function App({ connect = waitForBridge }: AppProps) {
           {openedParts !== null && openedParts > 1 && (
             <p className="question-note">{t('open.parts', { count: openedParts })}</p>
           )}
+          {remembered.map((score) => (
+            <p key={score.score_id} className="question-note">
+              {t('memory.replayed', {
+                name: score.instrument ?? score.title ?? '',
+                date: new Date(score.memory!.read_at).toLocaleDateString(i18n.resolvedLanguage),
+                corrections: t('memory.corrections', { count: score.memory!.applied }),
+                answers: t('memory.answers', { count: score.memory!.answers }),
+              })}
+              {score.memory!.skipped > 0 && ` ${t('memory.skipped', { count: score.memory!.skipped })}`}
+            </p>
+          ))}
           {openError && (
             <p className="error">{t(`errors.${openError}`, { defaultValue: t('errors.unexpected') })}</p>
           )}
@@ -282,6 +304,10 @@ export default function App({ connect = waitForBridge }: AppProps) {
 
       {exporting && engine.kind === 'connected' && scoreId !== null && (
         <ExportDialog api={engine.api} scoreId={scoreId} onClose={() => setExporting(false)} />
+      )}
+
+      {showRules && engine.kind === 'connected' && (
+        <RulesDialog api={engine.api} onClose={() => setShowRules(false)} />
       )}
 
       <footer className="status-bar" role="status">

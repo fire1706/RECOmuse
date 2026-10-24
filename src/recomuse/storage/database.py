@@ -13,7 +13,7 @@ from pathlib import Path
 from recomuse import paths
 
 # Version du schéma que ce code sait utiliser.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # Migrations à appliquer après schema.sql, dans l'ordre.
 # Chaque élément est (version atteinte, script SQL).
@@ -52,6 +52,32 @@ MIGRATIONS: list[tuple[int, str]] = [
     (4, """
         ALTER TABLE corrections ADD COLUMN location TEXT
             CHECK (location IS NULL OR json_valid(location));
+    """),
+    # Version 5 (tâche 12) : règles apprises et mémoire des partitions.
+    # - Chaque réponse garde le contexte du doute (« signature » : type de doute et ce qui
+    #   le caractérise, en JSON) et l'étiquette du choix ; qui a répondu : l'utilisateur,
+    #   une règle apprise, ou la mémoire (partition déjà lue). Les règles se déduisent des
+    #   réponses de l'utilisateur ayant la même signature.
+    # - rule_settings : règles que l'utilisateur a désactivées.
+    # - page_fingerprints : empreinte de chaque page lue, pour reconnaître une partition
+    #   déjà lue (même PDF, même scan) et reprendre ses corrections.
+    (5, """
+        ALTER TABLE question_answers ADD COLUMN signature TEXT
+            CHECK (signature IS NULL OR json_valid(signature));
+        ALTER TABLE question_answers ADD COLUMN choice_label TEXT;
+        ALTER TABLE question_answers ADD COLUMN answered_by TEXT NOT NULL DEFAULT 'user'
+            CHECK (answered_by IN ('user', 'rule', 'memory'));
+        CREATE INDEX idx_question_answers_signature ON question_answers(signature);
+        CREATE TABLE rule_settings (
+            signature  TEXT    PRIMARY KEY CHECK (json_valid(signature)),
+            enabled    INTEGER NOT NULL CHECK (enabled IN (0, 1))
+        );
+        CREATE TABLE page_fingerprints (
+            score_id     INTEGER NOT NULL REFERENCES scores(id),
+            page_number  INTEGER NOT NULL,
+            fingerprint  TEXT    NOT NULL,     -- 64 chiffres hexadécimaux (256 bits)
+            PRIMARY KEY (score_id, page_number)
+        );
     """),
 ]
 

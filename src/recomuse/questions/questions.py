@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from recomuse.learning.corrections import NewSymbol
+from recomuse.learning.rules import issue_signature
 from recomuse.model.score import Measure, Part, ScoreModel, Symbol
 from recomuse.validation.issues import Fix, Issue, ValidationReport
 
@@ -94,6 +95,9 @@ class Question:
     choices: list[Choice]
     confidence: float
     issue_count: int = 1                      # doutes réglés par cette seule question
+    # Type de doute et ce qui le caractérise (learning/rules.py) : la réponse donnée
+    # nourrit les règles apprises ; une règle apprise peut y répondre seule.
+    signature: dict[str, Any] | None = None
 
     def choice(self, choice_id: str) -> Choice:
         for choice in self.choices:
@@ -125,6 +129,8 @@ def build_questions(model: ScoreModel,
             continue
         builder = BUILDERS.get(issue.code)
         question = builder(model, issue) if builder else None
+        if question is not None:
+            question.signature = issue_signature(model, issue)
         if question is None:
             unasked.append(issue)
         elif question.key in questions:
@@ -139,6 +145,7 @@ def build_questions(model: ScoreModel,
             questions[question.key] = question
     for issues in out_of_range.values():
         question = _out_of_range(model, issues)
+        question.signature = issue_signature(model, issues[0])
         questions[question.key] = question
 
     ordered = sorted(questions.values(), key=lambda q: (

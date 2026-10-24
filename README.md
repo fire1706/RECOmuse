@@ -40,6 +40,10 @@ Export : « Exporter… » enregistre la partition pour MuseScore (.mscz, par Mu
 ligne de commande ; un MusicXML à la place s'il est absent), en MusicXML, ou en MIDI joué à
 la hauteur réelle de l'instrument. MuseScore peut être indiqué par la variable
 `RECOMUSE_MUSESCORE`.
+Apprentissage : quand l'utilisateur répond toujours de la même façon à un même doute
+(3 fois au moins, sur 2 partitions au moins), RECOmuse répond ensuite lui-même (« Règles
+apprises… » pour les voir et les désactiver). Une partition déjà lue et corrigée (mêmes
+pages) reprend ses corrections quand on la rouvre.
 
 Tests : `.venv\Scripts\python -m pytest` à la racine, `npm test` dans `ui/`.
 Tests lents, sur demande : `-m corpus` (vraies partitions de `tests/corpus/` ou `test/corpus/`)

@@ -90,7 +90,11 @@
       "time_as_read": "No, {{time}}, as read"
     },
     "compared_one": "Compared with {{count}} other part of the piece.",
-    "compared_other": "Compared with the {{count}} other parts of the piece."
+    "compared_other": "Compared with the {{count}} other parts of the piece.",
+    "byRules_one": "{{count}} answer given by the learned rules.",
+    "byRules_other": "{{count}} answers given by the learned rules.",
+    "byMemory_one": "{{count}} answer reused from a previous reading.",
+    "byMemory_other": "{{count}} answers reused from a previous reading."
   },
   "errors": {
     "unexpected": "An unexpected error occurred. Try again; if it happens again, please report it.",
@@ -305,5 +309,88 @@
     },
     "save": "Save…",
     "close": "Close"
+  },
+  "rules": {
+    "button": "Learned rules",
+    "title": "Learned rules",
+    "loading": "Loading…",
+    "close": "Close",
+    "explanation": "When you have answered similar questions the same way at least 3 times, on at least 2 scores, RECOmuse then gives that answer itself. Untick a rule to be asked the question again. \"Undo my last answer\" also undoes an answer given by a rule.",
+    "none": "No rules yet: they will come as you answer.",
+    "evidence_one": "{{agreeing}} identical answer out of {{count}}",
+    "evidence_other": "{{agreeing}} identical answers out of {{count}}",
+    "contexts": {
+      "clef_octave_suspicious": "Clef read with a small 8",
+      "note_position_mismatch": "Note read {{shift}} from its position on the staff ({{place}})",
+      "note_out_of_range": "Notes too {{direction}} for the instrument \"{{instrument}}\"",
+      "time_signature_missed": "Bars that do not match the time signature",
+      "time_signature_missing": "No time signature read at the start of the part",
+      "multirest_missed": "Rest read as a single bar ({{count_read}})",
+      "measure_number_mismatch": "Printed bar numbers that jump",
+      "part_measures_missing": "Fewer bars than the other parts",
+      "part_measures_extra": "More bars than the other parts",
+      "part_time_signature_differs": "Time signature different from the other parts",
+      "other": "Doubt \"{{code}}\""
+    },
+    "values": {
+      "shift": {
+        "octave": "an octave off",
+        "other": "differently"
+      },
+      "place": {
+        "above": "above the staff",
+        "below": "below the staff",
+        "inside": "within the staff",
+        "unknown": "unknown position"
+      },
+      "direction": {
+        "high": "high",
+        "low": "low"
+      },
+      "count_read": {
+        "true": "number read above",
+        "false": "number not read"
+      }
+    },
+    "answers": {
+      "default": {
+        "accept": "accept the proposed correction",
+        "keep": "keep what was read"
+      },
+      "clef_octave_suspicious": {
+        "accept": "normal clef, without an 8",
+        "keep": "keep the clef with an 8"
+      },
+      "note_position_mismatch": {
+        "accept": "take the note from its position",
+        "keep": "keep the note read"
+      },
+      "note_out_of_range": {
+        "accept": "move the notes by an octave",
+        "keep": "keep the notes"
+      },
+      "time_signature_missed": {
+        "accept": "change the time signature",
+        "keep": "keep the time signature"
+      },
+      "time_signature_missing": {
+        "accept": "add the proposed time signature"
+      },
+      "multirest_missed": {
+        "accept": "make it a rest of several bars",
+        "keep": "keep a single bar"
+      }
+    }
+  },
+  "memory": {
+    "replayed": "{{name}}: already read on {{date}}; {{corrections}} and {{answers}} reused.",
+    "corrections_zero": "no corrections",
+    "corrections_one": "{{count}} correction",
+    "corrections_other": "{{count}} corrections",
+    "answers_zero": "no answers",
+    "answers_one": "{{count}} answer",
+    "answers_other": "{{count}} answers",
+    "skipped_one": "({{count}} correction no longer applied.)",
+    "skipped_other": "({{count}} corrections no longer applied.)"
   }
 }

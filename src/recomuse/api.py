@@ -30,6 +30,7 @@ from recomuse.export.musescore import find_musescore
 from recomuse.importer import ScoreImportError
 from recomuse.importer.loading import IMAGE_EXTENSIONS
 from recomuse.instruments import parts as instruments
+from recomuse.learning import rules
 from recomuse.learning.corrections import CorrectionError, CorrectionService
 from recomuse.learning.journal import CorrectionJournal
 from recomuse.model.store import load_model
@@ -184,6 +185,20 @@ class Api:
     def transpose_score(self, score_id: int, request: dict) -> dict:
         """Crée la partition transposée : {"score": résumé, "report": compte rendu}."""
         return self._guarded(lambda: instruments.transpose_score(self._conn, score_id, request))
+
+    # --- Règles apprises ------------------------------------------------------------------
+
+    def get_rules(self) -> list[dict]:
+        """Règles apprises des réponses de l'utilisateur (voir learning.rules)."""
+        with self._db:
+            return [rule.to_dict() for rule in rules.learned_rules(self._conn)]
+
+    def set_rule_enabled(self, key: str, enabled: bool) -> dict:
+        """Active ou désactive une règle apprise ; renvoie la liste à jour."""
+        def update():
+            rules.set_enabled(self._conn, key, bool(enabled))
+            return {"rules": [rule.to_dict() for rule in rules.learned_rules(self._conn)]}
+        return self._guarded(update)
 
     # --- Exports --------------------------------------------------------------------------
 

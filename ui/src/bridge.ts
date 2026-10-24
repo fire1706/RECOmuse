@@ -21,6 +21,8 @@ export interface ScoreSummary {
   source_name: string | null
   pages: number[]
   measure_count: number
+  /** Partie déjà lue et corrigée : corrections et réponses reprises (à l'ouverture). */
+  memory?: { from: number; applied: number; skipped: number; answers: number; read_at: string }
 }
 
 /** Une réponse possible à une question. */
@@ -106,6 +108,9 @@ export interface QuestionsState {
   /** Nombre d'autres parties du morceau auxquelles la partition a été comparée. */
   compared_parts: number
   answered: number
+  /** Réponses données par les règles apprises, et reprises d'une lecture précédente. */
+  answered_by_rules: number
+  answered_by_memory: number
   can_undo: boolean
 }
 
@@ -196,6 +201,18 @@ export interface ExportResult {
   fallback: string | null
 }
 
+/** Une règle apprise (voir src/recomuse/learning/rules.py). */
+export interface Rule {
+  key: string
+  /** Type de doute (code) et ce qui le caractérise. */
+  signature: { code: string } & Record<string, unknown>
+  choice_id: string
+  choice_label: string | null
+  evidence: number
+  agreeing: number
+  enabled: boolean
+}
+
 /** Erreur renvoyée par le moteur : un code traduit par errors.<code>. */
 export interface EngineError {
   error: string
@@ -235,6 +252,8 @@ export interface PythonApi {
   get_export_options(scoreId: number): Promise<ExportOptions | EngineError>
   choose_save_path(filterLabel: string, defaultName: string, format: ExportFormat): Promise<string | null>
   export_score(scoreId: number, format: ExportFormat, path: string): Promise<ExportResult | EngineError>
+  get_rules(): Promise<Rule[]>
+  set_rule_enabled(key: string, enabled: boolean): Promise<{ rules: Rule[] } | EngineError>
 }
 
 /** Vrai si la réponse du moteur est une erreur. */
