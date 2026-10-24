@@ -33,6 +33,11 @@ from recomuse.importer.loading import (
 
 # En dessous de cette résolution d'origine, la reconnaissance risque d'être mauvaise.
 LOW_RESOLUTION_DPI = 200
+# Sous ce seuil, la page agrandie passe en noir et blanc pur (preprocess.clean_enlarged).
+# Pas au-dessus : vu sur le corpus, un conducteur scanné à 150 dpi (portées minuscules) y
+# perd des lignes de portée et Audiveris lit moins de pages, alors qu'une partie de tuba à
+# environ 70 dpi passe de 2 à 31 mesures justes sur 35.
+VERY_LOW_RESOLUTION_DPI = 120
 
 # Au-delà de cet angle, la page était nettement de travers : on le signale.
 LARGE_SKEW_DEGREES = 3.0
@@ -155,6 +160,9 @@ def _import_pdf(source: Path, work_dir: Path,
                     pixels, imported.rotation_degrees = preprocess.deskew(pixels)
                     if analysis.source_dpi and analysis.source_dpi < LOW_RESOLUTION_DPI:
                         imported.warnings.append("low_resolution")
+                    if analysis.source_dpi and analysis.source_dpi < VERY_LOW_RESOLUTION_DPI:
+                        # Image du PDF très agrandie au rendu : bords flous, à nettoyer.
+                        pixels = preprocess.clean_enlarged(pixels)
                 elif not analysis.music_fonts:
                     imported.warnings.append("no_music_font")
                 _finish_page(imported, pixels, work_dir)
@@ -192,9 +200,13 @@ def _import_image(source: Path, work_dir: Path,
 
         if imported.source_dpi:
             pixels = preprocess.rescale(pixels, TARGET_DPI / imported.source_dpi)
-            if (imported.source_dpi < LOW_RESOLUTION_DPI
-                    and "dpi_estimated" not in imported.warnings):
+            if imported.source_dpi < LOW_RESOLUTION_DPI:
+                # Résolution basse (lue dans le fichier, ou devinée d'après des portées
+                # minuscules) : signalée.
                 imported.warnings.append("low_resolution")
+            if imported.source_dpi < VERY_LOW_RESOLUTION_DPI:
+                # Très basse : l'agrandissement a laissé des bords flous, à nettoyer.
+                pixels = preprocess.clean_enlarged(pixels)
 
         _finish_page(imported, pixels, work_dir)
         pages.append(imported)

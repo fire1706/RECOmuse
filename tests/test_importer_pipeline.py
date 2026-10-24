@@ -10,7 +10,7 @@ import pytest
 
 from recomuse.importer import ScoreImportError, import_score, register_score
 from recomuse.importer.__main__ import main as cli_main
-from recomuse.importer.loading import read_image_file
+from recomuse.importer.loading import read_gray, read_image_file
 
 from synthetic import (
     png_bytes,
@@ -130,9 +130,29 @@ def test_png_without_resolution_is_estimated_from_staves(tmp_path):
     source = write_png_with_dpi(tmp_path / "p.png", staff_page(dpi=150), dpi=None)
     page = import_score(source, tmp_path / "out").pages[0]
 
-    assert page.warnings == ["dpi_estimated"]
+    # Résolution devinée basse : signalée.
+    assert page.warnings == ["dpi_estimated", "low_resolution"]
     assert page.source_dpi == pytest.approx(150, abs=15)
     assert page.interline == pytest.approx(22, abs=1)
+
+
+def test_very_low_resolution_is_cleaned_in_black_and_white(tmp_path):
+    # Capture d'écran ou scan à 90 dpi : la page agrandie passe en noir et blanc pur.
+    source = write_png_with_dpi(tmp_path / "p.png", staff_page(dpi=90), dpi=None)
+    page = import_score(source, tmp_path / "out").pages[0]
+    assert page.warnings == ["dpi_estimated", "low_resolution"]
+    assert page.source_dpi < 120
+    assert set(np.unique(read_gray(page.image_path))) <= {0, 255}
+
+
+def test_good_resolution_keeps_its_grey_levels(tmp_path):
+    # Une page déjà à bonne résolution n'est pas passée en noir et blanc (Audiveris fait
+    # lui-même mieux à partir des gris).
+    pixels = cv2.GaussianBlur(staff_page(dpi=300), (5, 5), 0)
+    source = write_png_with_dpi(tmp_path / "p.png", pixels, dpi=300)
+    page = import_score(source, tmp_path / "out").pages[0]
+    assert page.warnings == []
+    assert len(np.unique(read_gray(page.image_path))) > 2
 
 
 def test_meaningless_72_dpi_is_ignored(tmp_path):

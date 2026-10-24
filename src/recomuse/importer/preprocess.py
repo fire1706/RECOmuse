@@ -171,6 +171,18 @@ def rescale(gray: np.ndarray, factor: float) -> np.ndarray:
     return cv2.resize(gray, size, interpolation=interpolation)
 
 
+def clean_enlarged(gray: np.ndarray) -> np.ndarray:
+    """Passe en noir et blanc pur une page agrandie depuis une basse résolution.
+
+    Agrandir une petite image (capture d'écran, scan à 75 dpi...) laisse des bords gris
+    et flous autour des lignes et des notes : Audiveris s'y perd (vu sur une partie de
+    tuba à environ 70 dpi : 2 mesures justes sur 35, armure et chiffrage manqués). En noir
+    et blanc pur (seuil d'Otsu), il en lit 31 sur 35, avec l'armure et le chiffrage.
+    """
+    _, black_white = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return black_white
+
+
 def estimate_dpi_from_interline(interline: int) -> float:
     """Devine la résolution d'une image d'après la taille de ses portées."""
     return TARGET_DPI * interline / REFERENCE_INTERLINE_AT_300_DPI
