@@ -26,14 +26,15 @@ const page5: PageView = {
 const rendering: Rendering = {
   score_id: 1,
   mei: '<mei/>',
-  symbols: {},
+  symbols: { 's-n1': 'n1' },
   measures: { 'm-m1': 'm1', 'm-m2': 'm2' },
   measure_pages: { m1: 5, m2: 6 },
 }
 
 /** Faux Verovio : un dessin avec deux mesures. */
 const fakeRender = async () => [
-  '<svg><g id="m-m1" class="measure"><path d="M0 0"/></g><g id="m-m2" class="measure"><path d="M1 1"/></g></svg>',
+  '<svg><g id="m-m1" class="measure"><path d="M0 0"/></g>' +
+    '<g id="m-m2" class="measure"><g id="s-n1" class="note"><use/></g><path d="M1 1"/></g></svg>',
 ]
 
 describe('ScanView', () => {
@@ -87,7 +88,13 @@ describe('ScoreView', () => {
     expect(container.querySelector('#m-m2')).toHaveClass('selected')
 
     fireEvent.click(container.querySelector('#m-m2 path')!)
-    expect(onSelect).toHaveBeenCalledWith('m2', 6)
+    expect(onSelect).toHaveBeenCalledWith('m2', 6, null)
+    // Un clic sur une note choisit aussi la note ; elle est alors dessinée en bleu.
+    fireEvent.click(container.querySelector('#s-n1 use')!)
+    expect(onSelect).toHaveBeenLastCalledWith('m2', 6, 'n1')
+    rerender(<ScoreView api={api} scoreId={1} version={0} selectedMeasure="m2" selectedSymbol="n1"
+      onSelect={onSelect} render={fakeRender} />)
+    expect(container.querySelector('#s-n1')).toHaveClass('selected-symbol')
   })
 
   it('signale un dessin impossible', async () => {

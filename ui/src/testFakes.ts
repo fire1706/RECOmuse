@@ -65,6 +65,9 @@ export function fakeApi(overrides: Partial<PythonApi> = {}, info: AppInfo = fake
     undo_answer: async () => questionsState([]),
     get_page: async () => ({ error: 'page_not_found' }),
     get_rendering: async () => ({ error: 'score_not_found' }),
+    get_measure: async () => ({ error: 'edit_failed' }),
+    edit_score: async () => ({ error: 'edit_failed' }),
+    undo_edit: async () => ({ error: 'edit_failed' }),
     ...overrides,
   }
 }

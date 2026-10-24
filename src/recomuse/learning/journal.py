@@ -52,6 +52,9 @@ class Correction:
     group_id: str | None = None
     reason: str | None = None
     reverts_id: int | None = None
+    # Place du symbole dans sa mesure, pour un ajout ou une suppression :
+    # {"measure_id": ..., "list": "attributes" | "events", "index": rang}.
+    location: dict[str, Any] | None = None
     # Rempli par le journal à la lecture ; à laisser vide lors d'un enregistrement.
     id: int | None = None
     created_at: str | None = None
@@ -102,8 +105,8 @@ class CorrectionJournal:
                 symbol_id, symbol_kind,
                 bbox_x, bbox_y, bbox_width, bbox_height, snippet_path,
                 old_value, new_value, confidence, alternatives,
-                source, group_id, reason, reverts_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                source, group_id, reason, reverts_id, location
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 correction.score_id,
@@ -127,6 +130,7 @@ class CorrectionJournal:
                 correction.group_id,
                 correction.reason,
                 correction.reverts_id,
+                _to_json(correction.location),
             ),
         )
         return cursor.lastrowid
@@ -156,6 +160,7 @@ class CorrectionJournal:
                 bbox=original.bbox,
                 snippet_path=original.snippet_path,
                 group_id=original.group_id,
+                location=original.location,
             ),
             commit=commit,
         )
@@ -204,4 +209,5 @@ def _row_to_correction(row: sqlite3.Row) -> Correction:
         group_id=row["group_id"],
         reason=row["reason"],
         reverts_id=row["reverts_id"],
+        location=_from_json(row["location"]),
     )

@@ -14,7 +14,10 @@ interface ScoreViewProps {
   /** Change à chaque correction : le rendu est refait. */
   version: number
   selectedMeasure: string | null
-  onSelect: (measureId: string, page: number | null) => void
+  /** Symbole choisi (note, silence...) : dessiné en bleu. */
+  selectedSymbol?: string | null
+  /** Mesure cliquée, sa page d'origine, et le symbole cliqué (ou null). */
+  onSelect: (measureId: string, page: number | null, symbolId: string | null) => void
   /** Permet aux tests de remplacer Verovio. */
   render?: (mei: string) => Promise<string[]>
 }
@@ -29,7 +32,7 @@ export function measureAt(root: Element | null, x: number, y: number): Element |
 }
 
 export default function ScoreView({
-  api, scoreId, version, selectedMeasure, onSelect, render = renderMei,
+  api, scoreId, version, selectedMeasure, selectedSymbol = null, onSelect, render = renderMei,
 }: ScoreViewProps) {
   const { t } = useTranslation()
   const [rendering, setRendering] = useState<Rendering | null>(null)
@@ -59,12 +62,22 @@ export default function ScoreView({
     }
   }, [api, scoreId, version, render])
 
-  // Identifiant de mesure du modèle → identifiant MEI (celui du dessin).
+  // Identifiant du modèle (mesure ou symbole) → identifiant MEI (celui du dessin).
   const meiIds = useMemo(() => {
     const table: Record<string, string> = {}
     for (const [meiId, measureId] of Object.entries(rendering?.measures ?? {})) table[measureId] = meiId
+    for (const [meiId, symbolId] of Object.entries(rendering?.symbols ?? {})) table[symbolId] = meiId
     return table
   }, [rendering])
+
+  // Dessine en bleu le symbole choisi.
+  useEffect(() => {
+    const root = container.current
+    if (!root) return
+    root.querySelectorAll('.selected-symbol').forEach((el) => el.classList.remove('selected-symbol'))
+    const meiId = selectedSymbol ? meiIds[selectedSymbol] : undefined
+    if (meiId) root.querySelector(`#${CSS.escape(meiId)}`)?.classList.add('selected-symbol')
+  }, [selectedSymbol, meiIds, pages])
 
   // Surligne la mesure choisie et l'amène à l'écran.
   useEffect(() => {
@@ -85,7 +98,16 @@ export default function ScoreView({
       (event.target as Element).closest('g.measure') ??
       measureAt(container.current, event.clientX, event.clientY)
     const measureId = measure && rendering?.measures[measure.id]
-    if (measureId) onSelect(measureId, rendering?.measure_pages[measureId] ?? null)
+    if (measureId) onSelect(measureId, rendering?.measure_pages[measureId] ?? null, symbolAt(event.target as Element))
+  }
+
+  /** Symbole du modèle dessiné à cet endroit (la note, le silence...), ou null. */
+  function symbolAt(target: Element): string | null {
+    for (let el: Element | null = target; el && el !== container.current; el = el.parentElement) {
+      const symbolId = el.id ? rendering?.symbols[el.id] : undefined
+      if (symbolId) return symbolId
+    }
+    return null
   }
 
   if (error) return <p className="error">{t(`errors.${error}`, { defaultValue: t('errors.unexpected') })}</p>

@@ -109,6 +109,46 @@ export interface QuestionsState {
   can_undo: boolean
 }
 
+/** Un symbole d'une mesure (note, silence, clé, armure, chiffrage, pause multiple). */
+export interface MeasureSymbol {
+  id: string
+  kind: 'note' | 'rest' | 'clef' | 'key' | 'time' | 'multirest'
+  /** Valeur du modèle ; « written » : durée écrite en noires (« 1/2 » = croche). */
+  value: Record<string, unknown>
+  confidence: number
+  source: string
+}
+
+/** Contenu d'une mesure pour l'éditeur (voir src/recomuse/editing.py). */
+export interface MeasureDetails {
+  id: string
+  number: number
+  page: number | null
+  length: number
+  part_id: string
+  /** Durée lue et attendue, en noires (« 7/2 »), ou null. */
+  duration: string | null
+  expected: string | null
+  attributes: MeasureSymbol[]
+  events: MeasureSymbol[]
+  /** Clé, armure (dièses + / bémols -) et chiffrage en vigueur. */
+  state: { clef: { sign: string; line: number | null; octave_change?: number }; fifths: number; time: string | null }
+  previous: string | null
+  next: string | null
+  can_undo: boolean
+}
+
+/** Un geste d'édition (op : pitch, octave, alter, duration, tie, remove, add_note,
+ * add_rest, time, key, clef, multirest, set), avec ses paramètres. */
+export type Edit = { op: string } & Record<string, unknown>
+
+/** Résultat d'un geste : la mesure concernée et le symbole à garder choisi. */
+export interface EditResult {
+  measure_id: string | null
+  symbol_id: string | null
+  corrections: number[]
+}
+
 /** Erreur renvoyée par le moteur : un code traduit par errors.<code>. */
 export interface EngineError {
   error: string
@@ -134,6 +174,9 @@ export interface PythonApi {
   undo_answer(scoreId: number): Promise<QuestionsState | EngineError>
   get_page(scoreId: number, page: number): Promise<PageView | EngineError>
   get_rendering(scoreId: number): Promise<Rendering | EngineError>
+  get_measure(scoreId: number, measureId: string): Promise<MeasureDetails | EngineError>
+  edit_score(scoreId: number, edit: Edit): Promise<EditResult | EngineError>
+  undo_edit(scoreId: number): Promise<{ measure_id: string } | EngineError>
 }
 
 /** Vrai si la réponse du moteur est une erreur. */

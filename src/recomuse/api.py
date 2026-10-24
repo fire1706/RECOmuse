@@ -4,7 +4,10 @@ pywebview rend chaque méthode publique de la classe Api appelable depuis le
 JavaScript de l'interface :  await window.pywebview.api.get_app_info()
 Il n'y a pas de serveur HTTP pour l'API : les appels passent directement par pywebview.
 Chaque appel s'exécute dans son propre fil d'exécution : l'interface peut demander où en
-est la lecture d'un fichier (get_progress) pendant que open_file travaille.
+est la lecture d'un fichier (get_progress) pendant que open_file travaille. Les appels qui
+touchent à la base passent UN PAR UN (verrou _db) : la connexion SQLite est partagée, et
+deux demandes en même temps (après une correction, l'interface relit la page, le rendu,
+la mesure et les questions d'un coup) se mélangeraient.
 
 Règles :
 - les méthodes renvoient des données simples (dict, list, str, nombres) que
@@ -21,11 +24,12 @@ import sys
 import threading
 from pathlib import Path
 
-from recomuse import __version__, library
+from recomuse import __version__, editing, library
 from recomuse.importer import ScoreImportError
 from recomuse.importer.loading import IMAGE_EXTENSIONS
-from recomuse.learning.corrections import CorrectionError
+from recomuse.learning.corrections import CorrectionError, CorrectionService
 from recomuse.learning.journal import CorrectionJournal
+from recomuse.model.store import load_model
 from recomuse.questions.session import QuestionError, QuestionSession
 from recomuse.recognition.audiveris import AudiverisError
 from recomuse.recognition.tools import ToolNotFoundError
@@ -44,10 +48,12 @@ class Api:
         self._conn = conn
         self._db_path = db_path
         self._journal = CorrectionJournal(conn)
-        self._questions = QuestionSession(conn)
+        self._corrections = CorrectionService(conn)
+        self._questions = QuestionSession(conn, self._corrections)
         self._window = None                 # fenêtre pywebview, donnée par app.py
         self._progress: str | None = None   # étape de la lecture en cours (library.STAGES)
         self._busy = threading.Lock()       # une seule lecture de fichier à la fois
+        self._db = threading.RLock()        # un seul appel à la fois sur la base
 
     def ping(self) -> str:
         """Vérifie que le pont fonctionne : renvoie toujours « pong »."""
@@ -55,12 +61,14 @@ class Api:
 
     def get_app_info(self) -> dict:
         """Informations affichées dans l'écran d'accueil de l'interface."""
+        with self._db:
+            count = self._journal.count()
         return {
             "version": __version__,
             "python_version": platform.python_version(),
             "platform": sys.platform,
             "database_path": self._db_path,
-            "correction_count": self._journal.count(),
+            "correction_count": count,
         }
 
     # --- Partitions -----------------------------------------------------------------------
@@ -85,7 +93,9 @@ class Api:
             return {"error": "busy"}
         try:
             self._progress = "import"
-            scores = library.open_file(self._conn, Path(path), progress=self._set_progress)
+            with self._db:
+                scores = library.open_file(self._conn, Path(path),
+                                           progress=self._set_progress)
             return {"scores": scores}
         except (ScoreImportError, ToolNotFoundError, AudiverisError) as error:
             return {"error": error.code}
@@ -102,7 +112,8 @@ class Api:
 
     def list_scores(self) -> list[dict]:
         """Partitions déjà lues, de la plus récente à la plus ancienne."""
-        return library.list_scores(self._conn)
+        with self._db:
+            return library.list_scores(self._conn)
 
     # --- Vue côte à côte -------------------------------------------------------------------
 
@@ -115,6 +126,33 @@ class Api:
         """Partition reconnue en MEI, pour Verovio (voir library.rendering)."""
         result = self._guarded(lambda: library.rendering(self._conn, score_id))
         return result if result is not None else {"error": "score_not_found"}
+
+    # --- Édition manuelle ------------------------------------------------------------------
+
+    def get_measure(self, score_id: int, measure_id: str) -> dict:
+        """Contenu d'une mesure pour l'éditeur (voir editing.measure_details)."""
+        def details():
+            model = load_model(self._conn, score_id)
+            if model is None:
+                raise editing.EditError(f"Partition n° {score_id} introuvable.")
+            result = editing.measure_details(model, measure_id)
+            result["can_undo"] = bool(editing.last_edit(self._conn, score_id))
+            return result
+        return self._guarded(details)
+
+    def edit_score(self, score_id: int, edit: dict) -> dict:
+        """Applique un geste d'édition (voir editing.apply_edit)."""
+        return self._guarded(
+            lambda: editing.apply_edit(self._conn, self._corrections, score_id, edit))
+
+    def undo_edit(self, score_id: int) -> dict:
+        """Annule la dernière modification manuelle : {"measure_id": mesure concernée}."""
+        def undo():
+            measure_id = editing.undo_last_edit(self._conn, self._corrections, score_id)
+            if measure_id is None:
+                raise editing.EditError("Aucune modification à annuler.")
+            return {"measure_id": measure_id}
+        return self._guarded(undo)
 
     # --- Questions ------------------------------------------------------------------------
 
@@ -137,12 +175,17 @@ class Api:
         self._progress = stage
 
     def _guarded(self, action) -> dict:
-        """Exécute une demande ; une erreur devient {"error": code}."""
+        """Exécute une demande (une à la fois sur la base) ; une erreur devient
+        {"error": code}."""
         try:
-            return action()
+            with self._db:
+                return action()
         except (QuestionError, CorrectionError):
             log.exception("Question impossible")
             return {"error": "question_failed"}
+        except editing.EditError:
+            log.exception("Modification impossible")
+            return {"error": "edit_failed"}
         except Exception:
             log.exception("Erreur inattendue")
             return {"error": "unexpected"}

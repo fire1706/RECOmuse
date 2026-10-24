@@ -87,7 +87,7 @@ def test_database_version_1_is_upgraded(tmp_path):
     raw.close()
 
     conn = database.connect(path)
-    assert database.schema_version(conn) == database.SCHEMA_VERSION == 3
+    assert database.schema_version(conn) == database.SCHEMA_VERSION == 4
     assert conn.execute("SELECT COUNT(*) FROM scores").fetchone()[0] == 1
     save_model(conn, 1, sample_model())
     conn.close()

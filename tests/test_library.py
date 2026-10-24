@@ -106,3 +106,20 @@ def test_page_view_and_rendering(conn, tmp_path, no_tools, monkeypatch):
     assert set(rendering["measures"].values()) == {m["id"] for m in view["measures"]}
     assert set(rendering["measure_pages"].values()) == {1}
     assert api.get_rendering(999) == {"error": "score_not_found"}
+
+
+def test_simultaneous_calls_do_not_mix(conn, tmp_path, no_tools, monkeypatch):
+    """L'interface envoie plusieurs demandes à la fois (comme pywebview, chacune dans son
+    fil) : toutes doivent réussir, la connexion à la base étant partagée."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    monkeypatch.setattr("recomuse.paths.imports_dir", lambda: tmp_path / "travail")
+    api = Api(conn, ":memory:")
+    [score] = api.open_file(str(part_pdf(tmp_path / "partie.pdf")))["scores"]
+    sid = score["score_id"]
+    calls = [lambda: api.get_rendering(sid), lambda: api.get_page(sid, 1),
+             lambda: api.get_questions(sid), lambda: api.list_scores(),
+             lambda: api.get_app_info()] * 6
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda call: call(), calls))
+    assert not [r for r in results if isinstance(r, dict) and "error" in r]

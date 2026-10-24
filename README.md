@@ -27,6 +27,11 @@ d'un même morceau (même titre, dans un seul PDF ou dans des fichiers séparés
 comparées entre elles : une partie qui s'écarte des autres donne aussi une question.
 Vue côte à côte : à gauche la page d'origine (mesures encadrées), à droite la partition
 reconnue dessinée par Verovio ; cliquer une mesure d'un côté la montre de l'autre.
+Édition manuelle : la mesure choisie s'ouvre dans l'éditeur (au-dessus du rendu) : clé,
+armure, chiffrage, pause multiple, et pour chaque note sa hauteur (flèches ↑ ↓), son
+altération, sa durée, ses points, sa liaison ; ajouter ou supprimer (Suppr) une note.
+Chaque modification est une correction du journal ; « Annuler ma dernière modification »
+la défait.
 
 Tests : `.venv\Scripts\python -m pytest` à la racine, `npm test` dans `ui/`.
 Tests lents, sur demande : `-m corpus` (vraies partitions de `tests/corpus/` ou `test/corpus/`)

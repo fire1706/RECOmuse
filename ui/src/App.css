@@ -263,3 +263,80 @@ button:disabled {
 .checks ul {
   padding-left: 1.2rem;
 }
+
+/* --- Édition manuelle --------------------------------------------------------------- */
+
+.measure-editor {
+  position: sticky;
+  top: -1rem;
+  z-index: 1;
+  margin: -0.25rem 0 0.75rem;
+  padding: 0.6rem;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #f6f8fa;
+  font-size: 0.9rem;
+}
+
+.editor-header,
+.editor-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.editor-row label {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.editor-row input[type='number'] {
+  width: 3.5rem;
+}
+
+.inline-form {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.editor-label {
+  font-weight: 600;
+}
+
+.symbol-chip {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid #8c959f;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.symbol-chip.doubtful {
+  border-style: dashed;
+}
+
+.symbol-chip.selected,
+.symbol-editor button[aria-pressed='true'] {
+  border-color: #1971c2;
+  background: #d0ebff;
+}
+
+.symbol-editor {
+  padding-top: 0.4rem;
+  border-top: 1px solid #d0d7de;
+}
+
+.danger {
+  color: #b42318;
+}
+
+/* Symbole choisi dans le rendu : en bleu (la mesure choisie est en orange). */
+.score-view .selected-symbol,
+.score-view g.measure.selected .selected-symbol {
+  fill: #1971c2;
+  stroke: #1971c2;
+  color: #1971c2;
+}

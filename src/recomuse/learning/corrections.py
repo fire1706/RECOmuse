@@ -9,7 +9,9 @@ règle apprise ou du validateur, ce service :
 les étapes 2 et 3 dans une seule transaction : si l'une échoue, rien n'est enregistré.
 
 Une correction peut aussi AJOUTER un symbole que la lecture a manqué (une pause multiple,
-un chiffrage) : le journal l'enregistre sans ancienne valeur, et l'annuler le retire.
+un chiffrage, une note) : le journal l'enregistre sans ancienne valeur, et l'annuler le
+retire. Elle peut aussi en SUPPRIMER un (une note lue en trop) : le journal l'enregistre
+sans nouvelle valeur, avec sa place dans la mesure, et l'annuler le remet à cette place.
 
 L'historique des valeurs d'un symbole se lit dans le journal (history).
 """
@@ -32,15 +34,20 @@ SYMBOL_SOURCE = {"question": "user", "manual": "user", "rule": "rule", "validato
 
 # Ordre des réglages en tête de mesure : un symbole ajouté y prend sa place.
 ATTRIBUTE_ORDER = ("clef", "key", "time", "multirest")
+# Symboles du contenu de la mesure (notes et silences, dans l'ordre de lecture).
+EVENT_KINDS = ("note", "rest")
 
 
 @dataclass
 class NewSymbol:
-    """Symbole à ajouter dans une mesure (clé, armure, chiffrage ou pause multiple)."""
+    """Symbole à ajouter dans une mesure : un réglage (clé, armure, chiffrage, pause
+    multiple), ou une note ou un silence, placé juste après l'événement `after` (au début
+    de la mesure si `after` vaut None)."""
 
     measure_id: str
     kind: SymbolKind
     value: dict[str, Any]
+    after: str | None = None
 
 
 class CorrectionError(RuntimeError):
@@ -65,16 +72,20 @@ class CorrectionService:
 
     def apply_group(self, score_id: int, changes: list[tuple[str, dict[str, Any]]],
                     source: CorrectionSource, reason: str | None = None,
-                    additions: list[NewSymbol] | None = None) -> list[int]:
+                    additions: list[NewSymbol] | None = None,
+                    removals: list[str] | None = None) -> list[int]:
         """Corrige plusieurs symboles d'un coup : une seule réponse de l'utilisateur peut
-        corriger plusieurs mesures (même cause). `additions` : symboles à ajouter.
+        corriger plusieurs mesures (même cause). `additions` : symboles à ajouter,
+        `removals` : identifiants des symboles à supprimer.
         Toutes les corrections partagent un même numéro de groupe, et sont enregistrées
         ensemble ou pas du tout. Renvoie leurs numéros dans le journal."""
         if source == "revert":
             raise ValueError("Pour annuler une correction, utiliser revert().")
         additions = additions or []
+        removals = removals or []
         model = self._model(score_id)
-        group_id = uuid.uuid4().hex if len(changes) + len(additions) > 1 else None
+        count = len(changes) + len(additions) + len(removals)
+        group_id = uuid.uuid4().hex if count > 1 else None
 
         # Tout est vérifié AVANT d'écrire quoi que ce soit.
         prepared = []
@@ -88,6 +99,15 @@ class CorrectionService:
                 raise CorrectionError(f"Champs inconnus pour {symbol.kind} : {sorted(unknown)}")
             merged = {**symbol.value, **new_value}
             prepared.append((measure, symbol, merged, self._snippet(score_id, model, symbol)))
+        removed = []
+        for symbol_id in removals:
+            try:
+                _, measure, symbol = model.find(symbol_id)
+            except KeyError:
+                raise CorrectionError(f"Symbole introuvable : {symbol_id}") from None
+            if symbol_id in {s for s, _ in changes} or symbol in [r[1] for r in removed]:
+                raise CorrectionError(f"Symbole corrigé deux fois : {symbol_id}")
+            removed.append((measure, symbol, self._snippet(score_id, model, symbol)))
         added = []
         for addition in additions:
             measure, symbol = self._new_symbol(model, addition, source, added)
@@ -103,11 +123,18 @@ class CorrectionService:
                 symbol.value = merged
                 symbol.source = SYMBOL_SOURCE[source]
                 symbol.confidence = 1.0
-            for measure, symbol, snippet in added:
-                _insert_attribute(measure, symbol)
+            for measure, symbol, snippet in removed:
+                where = _location(measure, symbol)
+                ids.append(self._journal.record(
+                    _correction(score_id, measure, symbol, deepcopy(symbol.value), None,
+                                source, reason, group_id, snippet, where),
+                    commit=False))
+                getattr(measure, where["list"]).remove(symbol)
+            for (measure, symbol, snippet), addition in zip(added, additions, strict=True):
+                _insert(measure, symbol, addition.after)
                 ids.append(self._journal.record(
                     _correction(score_id, measure, symbol, None, deepcopy(symbol.value),
-                                source, reason, group_id, snippet),
+                                source, reason, group_id, snippet, _location(measure, symbol)),
                     commit=False))
             # Une pause multiple change la numérotation des mesures qui la suivent, un
             # chiffrage la durée attendue des mesures qui le suivent.
@@ -143,13 +170,19 @@ class CorrectionService:
         ids = []
         with self._conn:
             for original in reversed(originals):
+                if original.new_value is None:      # c'était une suppression : on le remet
+                    ids.append(self._journal.revert(original.id, commit=False))
+                    self._restore(model, original)
+                    continue
                 try:
                     _, measure, symbol = model.find(original.symbol_id)
                 except KeyError:
                     raise CorrectionError(f"Symbole introuvable : {original.symbol_id}") from None
                 ids.append(self._journal.revert(original.id, commit=False))
-                if original.old_value is None:
-                    measure.attributes.remove(symbol)   # c'était un ajout : on le retire
+                if original.old_value is None:      # c'était un ajout : on le retire
+                    for items in (measure.attributes, measure.events):
+                        if symbol in items:
+                            items.remove(symbol)
                 else:
                     symbol.value = original.old_value
                     # Le symbole redevient ce qu'il était : même confiance, même origine
@@ -175,6 +208,24 @@ class CorrectionService:
             raise CorrectionError(f"Aucun modèle pour la partition n° {score_id}.")
         return model
 
+    def _restore(self, model: ScoreModel, original: Correction) -> None:
+        """Remet un symbole supprimé à sa place (annulation d'une suppression)."""
+        where = original.location or {}
+        try:
+            _, measure = model.find_measure(where.get("measure_id", ""))
+        except KeyError:
+            message = f"Mesure introuvable pour remettre {original.symbol_id}."
+            raise CorrectionError(message) from None
+        box = original.bbox
+        confidence = original.confidence if original.confidence is not None else 1.0
+        symbol = Symbol(id=original.symbol_id, kind=original.symbol_kind,
+                        value=dict(original.old_value), page=original.page_number,
+                        bbox=(box.x, box.y, box.width, box.height) if box else None,
+                        confidence=confidence)
+        items = getattr(measure, where.get("list", "events"))
+        items.insert(min(where.get("index", len(items)), len(items)), symbol)
+        symbol.source = self._source_before(model, original)
+
     def _source_before(self, model: ScoreModel, original: Correction) -> str:
         """Origine du symbole juste avant la correction `original` : celle de la correction
         précédente encore en vigueur, sinon celle de la lecture de sa page."""
@@ -198,11 +249,17 @@ class CorrectionService:
             _, measure = model.find_measure(addition.measure_id)
         except KeyError:
             raise CorrectionError(f"Mesure introuvable : {addition.measure_id}") from None
-        if addition.kind not in ATTRIBUTE_ORDER:
+        if addition.kind not in ATTRIBUTE_ORDER + EVENT_KINDS:
             raise CorrectionError(f"Ajout impossible pour ce type de symbole : {addition.kind}")
-        if any(s.kind == addition.kind for s in measure.attributes) or any(
-                m is measure and s.kind == addition.kind for m, s, _ in pending):
+        already = (any(s.kind == addition.kind for s in measure.attributes)
+                   or any(m is measure and s.kind == addition.kind for m, s, _ in pending))
+        if addition.kind in ATTRIBUTE_ORDER and already:
             raise CorrectionError(f"La mesure {measure.id} a déjà un symbole {addition.kind}.")
+        after = None
+        if addition.after is not None:
+            after = next((s for s in measure.events if s.id == addition.after), None)
+            if after is None:
+                raise CorrectionError(f"Événement introuvable dans la mesure : {addition.after}")
         unknown = set(addition.value) - set(VALUE_FIELDS[addition.kind])
         if unknown:
             raise CorrectionError(f"Champs inconnus pour {addition.kind} : {sorted(unknown)}")
@@ -211,9 +268,12 @@ class CorrectionService:
         number = 0
         while f"{measure.id}.{addition.kind}+{number}" in taken:
             number += 1
-        # Position : le début de la mesure, là où s'écrit un chiffrage ou une pause.
+        # Position : celle de la note après laquelle on ajoute, sinon le début de la
+        # mesure (là où s'écrit un chiffrage ou une pause).
         bbox = None
-        if measure.bbox is not None:
+        if after is not None and after.bbox is not None:
+            bbox = after.bbox
+        elif measure.bbox is not None:
             x, y, w, h = measure.bbox
             bbox = (x, y, min(w, h), h)
         symbol = Symbol(id=f"{measure.id}.{addition.kind}+{number}", kind=addition.kind,
@@ -239,8 +299,13 @@ class CorrectionService:
         return relative.as_posix()
 
 
-def _insert_attribute(measure: Measure, symbol: Symbol) -> None:
-    """Range le symbole ajouté à sa place parmi les réglages de la mesure."""
+def _insert(measure: Measure, symbol: Symbol, after: str | None) -> None:
+    """Range le symbole ajouté à sa place : parmi les réglages de la mesure, ou parmi ses
+    notes et silences juste après l'événement `after` (au début s'il n'y en a pas)."""
+    if symbol.kind in EVENT_KINDS:
+        index = next((k + 1 for k, s in enumerate(measure.events) if s.id == after), 0)
+        measure.events.insert(index, symbol)
+        return
     rank = ATTRIBUTE_ORDER.index(symbol.kind)
     position = next((k for k, s in enumerate(measure.attributes)
                      if s.kind in ATTRIBUTE_ORDER and ATTRIBUTE_ORDER.index(s.kind) > rank),
@@ -248,13 +313,22 @@ def _insert_attribute(measure: Measure, symbol: Symbol) -> None:
     measure.attributes.insert(position, symbol)
 
 
-def _correction(score_id: int, measure: Measure, symbol: Symbol, old: dict | None, new: dict,
-                source: CorrectionSource, reason: str | None, group_id: str | None,
-                snippet: str | None) -> Correction:
+def _location(measure: Measure, symbol: Symbol) -> dict:
+    """Place d'un symbole dans sa mesure (pour le remettre où il était)."""
+    name = "attributes" if symbol in measure.attributes else "events"
+    return {"measure_id": measure.id, "list": name,
+            "index": getattr(measure, name).index(symbol)}
+
+
+def _correction(score_id: int, measure: Measure, symbol: Symbol, old: dict | None,
+                new: dict | None, source: CorrectionSource, reason: str | None,
+                group_id: str | None, snippet: str | None,
+                location: dict | None = None) -> Correction:
     bbox = BoundingBox(*symbol.bbox) if symbol.bbox else None
     return Correction(
         score_id=score_id, page_number=symbol.page, measure_number=measure.number,
         symbol_id=symbol.id, symbol_kind=symbol.kind, bbox=bbox, snippet_path=snippet,
         old_value=old, new_value=new, confidence=symbol.confidence,
         alternatives=symbol.alternatives, source=source, group_id=group_id, reason=reason,
+        location=location,
     )

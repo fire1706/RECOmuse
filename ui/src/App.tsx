@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next'
 
 import { type AppInfo, isError, type PythonApi, type ScoreSummary, waitForBridge } from './bridge'
 import { SUPPORTED_LANGUAGES } from './i18n'
+import MeasureEditor from './MeasureEditor'
 import QuestionPanel from './QuestionPanel'
 import ScanView from './ScanView'
 import ScoreView from './ScoreView'
@@ -62,7 +63,10 @@ export default function App({ connect = waitForBridge }: AppProps) {
   // chaque correction (les deux vues se redessinent alors).
   const [page, setPage] = useState<number | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [symbol, setSymbol] = useState<string | null>(null)
   const [version, setVersion] = useState(0)
+  // Change après une modification manuelle : les questions sont recalculées.
+  const [editVersion, setEditVersion] = useState(0)
   const poll = useRef<number | null>(null)
 
   useEffect(() => {
@@ -95,20 +99,38 @@ export default function App({ connect = waitForBridge }: AppProps) {
     if (engine.kind !== 'connected') return
     const info = await engine.api.get_app_info()
     setEngine({ ...engine, info })
+    // Le nombre de mesures d'une partition a pu changer (pause multiple corrigée).
+    setScores(await engine.api.list_scores())
   }, [engine])
 
   /** Choisit une partition : sa première page, aucune mesure choisie. */
   const chooseScore = useCallback((id: number | null, known: ScoreSummary[]) => {
     setScoreId(id)
     setSelected(null)
+    setSymbol(null)
     setPage(known.find((s) => s.score_id === id)?.pages[0] ?? null)
   }, [])
 
-  /** Montre une mesure des deux côtés (et sa page à gauche). */
-  const focusMeasure = useCallback((measureId: string | null, measurePage: number | null) => {
-    setSelected(measureId)
-    if (measurePage !== null) setPage(measurePage)
-  }, [])
+  /** Montre une mesure des deux côtés (et sa page à gauche), et choisit un symbole. */
+  const focusMeasure = useCallback(
+    (measureId: string | null, measurePage: number | null, symbolId: string | null = null) => {
+      setSelected(measureId)
+      setSymbol(symbolId)
+      if (measurePage !== null) setPage(measurePage)
+    },
+    [],
+  )
+
+  /** Après une modification manuelle : tout est redessiné, les questions recalculées. */
+  const afterEdit = useCallback(
+    (measureId: string | null, symbolId: string | null) => {
+      if (measureId) setSelected(measureId)
+      setSymbol(symbolId)
+      setEditVersion((v) => v + 1)
+      refreshInfo()
+    },
+    [refreshInfo],
+  )
 
   async function openScore() {
     if (engine.kind !== 'connected') return
@@ -212,17 +234,22 @@ export default function App({ connect = waitForBridge }: AppProps) {
             <p className="error">{t(`errors.${openError}`, { defaultValue: t('errors.unexpected') })}</p>
           )}
           {reading === null && engine.kind === 'connected' && scoreId !== null ? (
-            <QuestionPanel api={engine.api} scoreId={scoreId} onAnswered={refreshInfo}
-              onFocus={focusMeasure} />
+            <QuestionPanel key={`${scoreId}-${editVersion}`} api={engine.api} scoreId={scoreId}
+              onAnswered={refreshInfo} onFocus={focusMeasure} />
           ) : (
             reading === null && <p className="empty">{t('panels.questionsEmpty')}</p>
           )}
         </section>
         <section className="panel" aria-labelledby="panel-result">
           <h2 id="panel-result">{t('panels.result')}</h2>
+          {engine.kind === 'connected' && scoreId !== null && reading === null && selected !== null && (
+            <MeasureEditor api={engine.api} scoreId={scoreId} measureId={selected} symbolId={symbol}
+              version={version} onSelectSymbol={setSymbol}
+              onSelectMeasure={(id) => focusMeasure(id, null)} onEdited={afterEdit} />
+          )}
           {engine.kind === 'connected' && scoreId !== null && reading === null ? (
             <ScoreView api={engine.api} scoreId={scoreId} version={version}
-              selectedMeasure={selected} onSelect={focusMeasure} />
+              selectedMeasure={selected} selectedSymbol={symbol} onSelect={focusMeasure} />
           ) : (
             <p className="empty">{t('panels.resultEmpty')}</p>
           )}

@@ -13,7 +13,7 @@ from pathlib import Path
 from recomuse import paths
 
 # Version du schéma que ce code sait utiliser.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Migrations à appliquer après schema.sql, dans l'ordre.
 # Chaque élément est (version atteinte, script SQL).
@@ -45,6 +45,13 @@ MIGRATIONS: list[tuple[int, str]] = [
             undone          INTEGER NOT NULL DEFAULT 0 CHECK (undone IN (0, 1))
         );
         CREATE INDEX idx_question_answers_score ON question_answers(score_id);
+    """),
+    # Version 4 (tâche 9b) : place d'un symbole ajouté ou supprimé dans sa mesure
+    # (identifiant de la mesure, liste « attributes » ou « events », rang), en JSON.
+    # Annuler la suppression d'une note la remet exactement où elle était.
+    (4, """
+        ALTER TABLE corrections ADD COLUMN location TEXT
+            CHECK (location IS NULL OR json_valid(location));
     """),
 ]
 

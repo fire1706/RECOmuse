@@ -202,7 +202,8 @@ def test_impossible_additions_are_refused(conn, service, score_id, two_measures)
 
     for addition in [NewSymbol("absente", "multirest", {"count": 2}),
                      NewSymbol("m1", "time", {"beats": 3, "beat_type": 4}),   # déjà un chiffrage
-                     NewSymbol("m1", "note", {"step": "C"}),
+                     NewSymbol("m1", "slur", {}),
+                     NewSymbol("m1", "note", {"step": "C"}, after="absent"),
                      NewSymbol("m1", "multirest", {"nombre": 2})]:
         with pytest.raises(CorrectionError):
             service.apply_group(score_id, [], source="question", additions=[addition])
@@ -226,3 +227,36 @@ def test_revert_restores_confidence_and_origin(conn, service, score_id, stored):
     service.revert(first)
     note = load_model(conn, score_id).find("n1")[2]
     assert (note.source, note.confidence, note.value["octave"]) == ("audiveris", 0.4, 5)
+
+
+def test_removing_and_adding_notes_and_undoing(conn, service, score_id, stored):
+    """Une note lue en trop est supprimée, une note oubliée ajoutée ; l'annulation remet
+    tout comme avant, la note supprimée à sa place exacte."""
+    from recomuse.learning.corrections import NewSymbol
+
+    value = {"step": "E", "octave": 5, "alter": 0, "duration": "1", "voice": 1}
+    ids = service.apply_group(score_id, [], source="manual", removals=["n1"],
+                              additions=[NewSymbol("m1", "note", value, after="n2")])
+    events = load_model(conn, score_id).parts[0].measures[0].events
+    assert [s.id for s in events] == ["n2", "m1.note+0"]
+    journal = CorrectionJournal(conn)
+    removal, addition = (journal.get(i) for i in ids)
+    assert removal.new_value is None and removal.old_value["octave"] == 5
+    assert removal.location == {"measure_id": "m1", "list": "events", "index": 0}
+    assert addition.location == {"measure_id": "m1", "list": "events", "index": 1}
+    assert addition.bbox.x == 450.0                     # à la place de la note qui précède
+
+    service.revert_all(ids)
+    events = load_model(conn, score_id).parts[0].measures[0].events
+    assert [s.id for s in events] == ["n1", "n2"]
+    restored = events[0]
+    assert restored.value["octave"] == 5 and restored.bbox == (400.0, 300.0, 25.0, 20.0)
+    assert restored.confidence == 0.4
+
+    # Ajout au début de la mesure ; un symbole ne peut pas être corrigé et supprimé.
+    service.apply_group(score_id, [], source="manual",
+                        additions=[NewSymbol("m1", "rest", {"duration": "1"})])
+    assert load_model(conn, score_id).parts[0].measures[0].events[0].kind == "rest"
+    with pytest.raises(CorrectionError):
+        service.apply_group(score_id, [("n2", {"octave": 4})], source="manual",
+                            removals=["n2"])

@@ -108,7 +108,8 @@
     "no_music_recognized": "Aucune musique n'a été trouvée dans ce fichier.",
     "page_not_found": "Cette page est introuvable.",
     "score_not_found": "Cette partition est introuvable.",
-    "rendering_failed": "La partition n'a pas pu être dessinée."
+    "rendering_failed": "La partition n'a pas pu être dessinée.",
+    "edit_failed": "Cette modification n'a pas pu être faite."
   },
   "scan": {
     "loading": "Chargement de la page…",
@@ -133,5 +134,69 @@
     "part_measures_extra": ": cette partie a {{extra}} mesure(s) de plus que les autres par ici.",
     "part_time_signature_differs": ": le chiffrage diffère de celui des autres parties.",
     "other": ": à vérifier."
+  },
+  "editor": {
+    "loading": "Lecture de la mesure…",
+    "measure": "Mesure {{number}}",
+    "previous": "◀ Précédente",
+    "next": "Suivante ▶",
+    "undo": "Annuler ma dernière modification",
+    "wrongLength": "Cette mesure compte {{read}} noire(s) au lieu de {{expected}}.",
+    "clef": "Clé",
+    "key": "Armure",
+    "time": "Chiffrage",
+    "beats": "Nombre de temps",
+    "beatType": "Unité de temps",
+    "apply": "Appliquer",
+    "restLength": "Durée (mesures)",
+    "noAccidental": "Aucune altération",
+    "sharps_one": "{{count}} dièse",
+    "sharps_other": "{{count}} dièses",
+    "flats_one": "{{count}} bémol",
+    "flats_other": "{{count}} bémols",
+    "clefs": {
+      "treble": "Clé de sol",
+      "treble8": "Clé de sol 8 en dessous",
+      "bass": "Clé de fa",
+      "alto": "Clé d'ut 3e ligne",
+      "tenor": "Clé d'ut 4e ligne",
+      "percussion": "Clé de percussion",
+      "other": "Autre clé"
+    },
+    "emptyMeasure": "Mesure vide.",
+    "addNoteStart": "Ajouter une note",
+    "addRestStart": "Ajouter un silence",
+    "pitch": "Hauteur",
+    "up": "▲ Plus haut",
+    "down": "▼ Plus bas",
+    "octaveUp": "Octave +",
+    "octaveDown": "Octave −",
+    "alter": {
+      "flat": "♭ Bémol",
+      "natural": "♮ Bécarre",
+      "sharp": "♯ Dièse"
+    },
+    "duration": "Durée",
+    "durations": {
+      "whole": "ronde",
+      "half": "blanche",
+      "quarter": "noire",
+      "eighth": "croche",
+      "sixteenth": "double croche",
+      "thirtySecond": "triple croche"
+    },
+    "dots_zero": "Sans point",
+    "dots_one": "{{count}} point",
+    "dots_other": "{{count}} points",
+    "dotted_one": "pointée",
+    "dotted_other": "doublement pointée",
+    "tuplet": "(nolet)",
+    "rest": "silence",
+    "fullRest": "pause (toute la mesure)",
+    "percussionNote": "frappe",
+    "tie": "Lier à la note suivante",
+    "addNote": "Ajouter une note après",
+    "addRest": "Ajouter un silence après",
+    "remove": "Supprimer"
   }
 }
