@@ -11,6 +11,8 @@ corrections sont rejouées une à une sur la nouvelle lecture (source « rule »
 « memory:<numéro> » dans le journal), et les réponses aux questions reprises : les
 questions déjà réglées ne sont pas reposées. Une correction dont le symbole n'existe
 plus (la lecture a changé) est passée.
+Les corrections peuvent aussi venir d'un pack d'apprentissage (learning/packs.py) : la
+même partie, corrigée par un autre membre de la fanfare.
 """
 
 import json
@@ -79,9 +81,7 @@ def find_previous(conn: sqlite3.Connection, prints: dict[int, str],
         if score_id in (exclude or set()):
             continue
         pages = [value for _, value in sorted(stored[score_id])]
-        if len(pages) == len(wanted) and all(
-                distance(a, b) <= MAX_DISTANCE for a, b in zip(pages, wanted, strict=True)) \
-                and _has_work(conn, score_id):
+        if same_pages(pages, wanted) and _has_work(conn, score_id):
             return score_id
     return None
 
@@ -94,16 +94,44 @@ def _has_work(conn: sqlite3.Connection, score_id: int) -> bool:
     return bool(corrections or answers)
 
 
+def score_work(conn: sqlite3.Connection, score_id: int) -> tuple[list[dict], list[dict]]:
+    """Le travail fait sur une partition, sous une forme simple (pour le rejouer ailleurs,
+    ou le mettre dans un pack) : ses corrections encore en vigueur, dans l'ordre, et ses
+    réponses aux questions."""
+    history = CorrectionJournal(conn).list_for_score(score_id)
+    reverted = {c.reverts_id for c in history if c.source == "revert"}
+    corrections = [
+        {"id": c.id, "group_id": c.group_id, "symbol_id": c.symbol_id,
+         "symbol_kind": c.symbol_kind, "old_value": c.old_value, "new_value": c.new_value,
+         "location": c.location}
+        for c in history if c.source != "revert" and c.id not in reverted]
+    rows = conn.execute(
+        "SELECT question_key, code, choice_id, value, correction_ids, signature, choice_label"
+        " FROM question_answers WHERE score_id = ? AND undone = 0 ORDER BY id", (score_id,))
+    answers = [{"question_key": key, "code": code, "choice_id": choice_id, "value": value,
+                "correction_ids": json.loads(ids), "signature": signature,
+                "choice_label": label}
+               for key, code, choice_id, value, ids, signature, label in rows.fetchall()]
+    return corrections, answers
+
+
 def replay(conn: sqlite3.Connection, service: CorrectionService, old_id: int,
            new_id: int) -> dict:
     """Rejoue sur la partition `new_id` les corrections encore en vigueur de `old_id`, puis
     reprend ses réponses aux questions. Renvoie {"from", "applied", "skipped", "answers"}."""
-    history = CorrectionJournal(conn).list_for_score(old_id)
-    reverted = {c.reverts_id for c in history if c.source == "revert"}
-    alive = [c for c in history if c.source != "revert" and c.id not in reverted]
-    groups: list[list] = []
-    for correction in alive:
-        if correction.group_id and groups and groups[-1][0].group_id == correction.group_id:
+    corrections, answers = score_work(conn, old_id)
+    return {"from": old_id,
+            **replay_work(conn, service, corrections, answers, new_id, f"memory:{old_id}")}
+
+
+def replay_work(conn: sqlite3.Connection, service: CorrectionService, corrections: list[dict],
+                answers: list[dict], new_id: int, reason: str) -> dict:
+    """Rejoue des corrections (et reprend des réponses), venant d'une partition de la base
+    ou d'un pack d'apprentissage. Renvoie {"applied", "skipped", "answers"}."""
+    groups: list[list[dict]] = []
+    for correction in corrections:
+        if correction["group_id"] and groups \
+                and groups[-1][0]["group_id"] == correction["group_id"]:
             groups[-1].append(correction)
         else:
             groups.append([correction])
@@ -114,44 +142,47 @@ def replay(conn: sqlite3.Connection, service: CorrectionService, old_id: int,
         model = load_model(conn, new_id)
         changes, removals, additions, order = [], [], [], ([], [], [])
         for c in group:
-            if c.old_value is None:                       # ajout
-                where = c.location or {}
+            if c["old_value"] is None:                    # ajout
+                where = c["location"] or {}
                 after = _event_before(model, where) if where.get("list") == "events" else None
                 if not _measure_exists(model, where.get("measure_id")):
                     skipped += 1
                     continue
-                additions.append(NewSymbol(where["measure_id"], c.symbol_kind,
-                                           dict(c.new_value), after=after))
-                order[2].append(c.id)
-            elif not _symbol_exists(model, c.symbol_id):
+                additions.append(NewSymbol(where["measure_id"], c["symbol_kind"],
+                                           dict(c["new_value"]), after=after))
+                order[2].append(c["id"])
+            elif not _symbol_exists(model, c["symbol_id"]):
                 skipped += 1
-            elif c.new_value is None:                     # suppression
-                removals.append(c.symbol_id)
-                order[1].append(c.id)
+            elif c["new_value"] is None:                  # suppression
+                removals.append(c["symbol_id"])
+                order[1].append(c["id"])
             else:
-                changes.append((c.symbol_id, dict(c.new_value)))
-                order[0].append(c.id)
+                changes.append((c["symbol_id"], dict(c["new_value"])))
+                order[0].append(c["id"])
         if not (changes or removals or additions):
             continue
-        ids = service.apply_group(new_id, changes, source="rule", reason=f"memory:{old_id}",
+        ids = service.apply_group(new_id, changes, source="rule", reason=reason,
                                   additions=additions, removals=removals)
         mapping.update(zip(order[0] + order[1] + order[2], ids, strict=True))
         applied += len(ids)
 
-    answers = 0
-    rows = conn.execute(
-        "SELECT question_key, code, choice_id, value, correction_ids, signature, choice_label"
-        " FROM question_answers WHERE score_id = ? AND undone = 0 ORDER BY id", (old_id,))
     with conn:
-        for key, code, choice_id, value, correction_ids, signature, label in rows.fetchall():
-            ids = [mapping[i] for i in json.loads(correction_ids) if i in mapping]
+        for answer in answers:
+            ids = [mapping[i] for i in answer["correction_ids"] if i in mapping]
             conn.execute(
                 "INSERT INTO question_answers (score_id, question_key, code, choice_id, value,"
                 " correction_ids, signature, choice_label, answered_by)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'memory')",
-                (new_id, key, code, choice_id, value, json.dumps(ids), signature, label))
-            answers += 1
-    return {"from": old_id, "applied": applied, "skipped": skipped, "answers": answers}
+                (new_id, answer["question_key"], answer["code"], answer["choice_id"],
+                 answer["value"], json.dumps(ids), answer["signature"],
+                 answer["choice_label"]))
+    return {"applied": applied, "skipped": skipped, "answers": len(answers)}
+
+
+def same_pages(stored: list[str], wanted: list[str]) -> bool:
+    """Vrai si deux suites d'empreintes sont celles des mêmes pages, dans le même ordre."""
+    return len(stored) == len(wanted) and all(
+        distance(a, b) <= MAX_DISTANCE for a, b in zip(stored, wanted, strict=True))
 
 
 def _symbol_exists(model: ScoreModel, symbol_id: str | None) -> bool:

@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { type AppInfo, isError, type PythonApi, type ScoreSummary, waitForBridge } from './bridge'
 import { SUPPORTED_LANGUAGES } from './i18n'
 import MeasureEditor from './MeasureEditor'
+import PacksDialog from './PacksDialog'
 import QuestionPanel from './QuestionPanel'
 import RulesDialog from './RulesDialog'
 import ScanView from './ScanView'
@@ -75,6 +76,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
   const [transposing, setTransposing] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [showRules, setShowRules] = useState(false)
+  const [showPacks, setShowPacks] = useState(false)
   const poll = useRef<number | null>(null)
 
   useEffect(() => {
@@ -222,6 +224,11 @@ export default function App({ connect = waitForBridge }: AppProps) {
               {t('rules.button')}
             </button>
           )}
+          {connected && (
+            <button type="button" onClick={() => setShowPacks(true)}>
+              {t('packs.button')}
+            </button>
+          )}
           <label className="language-picker">
             {t('language.label')}
             <select value={i18n.resolvedLanguage} onChange={(e) => i18n.changeLanguage(e.target.value)}>
@@ -257,8 +264,9 @@ export default function App({ connect = waitForBridge }: AppProps) {
           )}
           {remembered.map((score) => (
             <p key={score.score_id} className="question-note">
-              {t('memory.replayed', {
+              {t(score.memory!.from_pack ? 'memory.fromPack' : 'memory.replayed', {
                 name: score.instrument ?? score.title ?? '',
+                author: score.memory!.author ?? t('packs.anonymous'),
                 date: new Date(score.memory!.read_at).toLocaleDateString(i18n.resolvedLanguage),
                 corrections: t('memory.corrections', { count: score.memory!.applied }),
                 answers: t('memory.answers', { count: score.memory!.answers }),
@@ -304,6 +312,10 @@ export default function App({ connect = waitForBridge }: AppProps) {
 
       {exporting && engine.kind === 'connected' && scoreId !== null && (
         <ExportDialog api={engine.api} scoreId={scoreId} onClose={() => setExporting(false)} />
+      )}
+
+      {showPacks && engine.kind === 'connected' && (
+        <PacksDialog api={engine.api} onClose={() => setShowPacks(false)} />
       )}
 
       {showRules && engine.kind === 'connected' && (

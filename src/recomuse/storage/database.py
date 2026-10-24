@@ -13,7 +13,7 @@ from pathlib import Path
 from recomuse import paths
 
 # Version du schéma que ce code sait utiliser.
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 # Migrations à appliquer après schema.sql, dans l'ordre.
 # Chaque élément est (version atteinte, script SQL).
@@ -77,6 +77,40 @@ MIGRATIONS: list[tuple[int, str]] = [
             page_number  INTEGER NOT NULL,
             fingerprint  TEXT    NOT NULL,     -- 64 chiffres hexadécimaux (256 bits)
             PRIMARY KEY (score_id, page_number)
+        );
+    """),
+    # Version 6 (tâche 13) : packs d'apprentissage reçus d'autres membres de la fanfare.
+    # Ce qui vient d'un pack est rangé à part (le journal reste celui de l'utilisateur) et
+    # peut être retiré d'un coup : supprimer le pack supprime ses réponses et parties.
+    # - pack_answers : leurs réponses aux questions (pour les règles apprises) ;
+    # - pack_scores : leurs parties corrigées (empreintes des pages, corrections et
+    #   réponses en JSON), pour la mémoire des partitions.
+    (6, """
+        CREATE TABLE packs (
+            id               INTEGER PRIMARY KEY,
+            uuid             TEXT    NOT NULL UNIQUE,   -- identifiant du pack (pas de doublon)
+            author           TEXT,                      -- nom donné par celui qui l'a fait
+            created_at       TEXT    NOT NULL,
+            recomuse_version TEXT,
+            imported_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        CREATE TABLE pack_answers (
+            pack_id      INTEGER NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
+            score_key    TEXT    NOT NULL,              -- partie d'origine, dans le pack
+            signature    TEXT    NOT NULL CHECK (json_valid(signature)),
+            choice_id    TEXT    NOT NULL,
+            choice_label TEXT
+        );
+        CREATE INDEX idx_pack_answers_signature ON pack_answers(signature);
+        CREATE TABLE pack_scores (
+            pack_id      INTEGER NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
+            score_key    TEXT    NOT NULL,
+            title        TEXT,
+            part_name    TEXT,
+            fingerprints TEXT    NOT NULL CHECK (json_valid(fingerprints)),
+            corrections  TEXT    NOT NULL CHECK (json_valid(corrections)),
+            answers      TEXT    NOT NULL CHECK (json_valid(answers)),
+            PRIMARY KEY (pack_id, score_key)
         );
     """),
 ]

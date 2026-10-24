@@ -6,7 +6,8 @@ textes) → modèle interne → séparation des parties (un PDF peut les conteni
 Chaque partie devient une partition de la base, avec son modèle. Les parties d'un même
 morceau (même titre) sont comparées entre elles pour poser les questions (piece_of).
 Une partie déjà lue et corrigée (mêmes pages : learning/memory.py) reprend ses
-corrections et ses réponses aux questions.
+corrections et ses réponses aux questions ; à défaut, celles d'un pack d'apprentissage
+reçu d'un autre membre (learning/packs.py).
 
 C'est long (une ou deux minutes pour une page scannée) : `progress` est appelé à chaque
 étape, pour que l'interface puisse dire où on en est.
@@ -20,7 +21,7 @@ from pathlib import Path
 from recomuse import paths
 from recomuse.export.mei import model_to_mei
 from recomuse.importer import import_score, register_score
-from recomuse.learning import memory
+from recomuse.learning import memory, packs
 from recomuse.learning.corrections import CorrectionService
 from recomuse.model.build import build_model
 from recomuse.model.score import ScoreModel
@@ -66,10 +67,19 @@ def open_file(conn: sqlite3.Connection, source: Path | str,
         previous = memory.find_previous(conn, prints, exclude=created)
         memory.store(conn, score_id, prints)
         result = summary(score_id, part)
+        shared = packs.find_score(conn, prints) if previous is None else None
         if previous is not None:
             replayed = memory.replay(conn, CorrectionService(conn), previous, score_id)
             replayed["read_at"] = conn.execute(
                 "SELECT imported_at FROM scores WHERE id = ?", (previous,)).fetchone()[0]
+            result = summary(score_id, load_model(conn, score_id)) | {"memory": replayed}
+        elif shared is not None:
+            # La même partie, corrigée par un autre membre (pack d'apprentissage).
+            replayed = memory.replay_work(conn, CorrectionService(conn), shared["corrections"],
+                                          shared["answers"], score_id,
+                                          f"pack:{shared['pack_id']}")
+            replayed |= {"from_pack": shared["pack_id"], "author": shared["author"],
+                         "read_at": shared["created_at"]}
             result = summary(score_id, load_model(conn, score_id)) | {"memory": replayed}
         summaries.append(result)
     report("done")

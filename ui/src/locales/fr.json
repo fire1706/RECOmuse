@@ -116,7 +116,10 @@
     "edit_failed": "Cette modification n'a pas pu être faite.",
     "transposition_failed": "Cette transposition n'a pas pu être faite.",
     "write_failed": "Le fichier n'a pas pu être écrit (dossier protégé, disque plein ?).",
-    "unknown_format": "Format d'export inconnu."
+    "unknown_format": "Format d'export inconnu.",
+    "not_a_pack": "Ce fichier n'est pas un pack d'apprentissage RECOmuse.",
+    "pack_too_new": "Ce pack a été fait par une version plus récente de RECOmuse : mettez RECOmuse à jour.",
+    "pack_already_imported": "Ce pack a déjà été importé."
   },
   "scan": {
     "loading": "Chargement de la page…",
@@ -380,7 +383,9 @@
         "accept": "en faire une pause de plusieurs mesures",
         "keep": "garder une seule mesure"
       }
-    }
+    },
+    "fromPacks_one": "(dont {{count}} venue d'un pack)",
+    "fromPacks_other": "(dont {{count}} venues de packs)"
   },
   "memory": {
     "replayed": "{{name}} : déjà lue le {{date}} ; {{corrections}} et {{answers}} reprises.",
@@ -391,6 +396,32 @@
     "answers_one": "{{count}} réponse",
     "answers_other": "{{count}} réponses",
     "skipped_one": "({{count}} correction ne s'appliquait plus.)",
-    "skipped_other": "({{count}} corrections ne s'appliquaient plus.)"
+    "skipped_other": "({{count}} corrections ne s'appliquaient plus.)",
+    "fromPack": "{{name}} : déjà corrigée par {{author}} (pack) ; {{corrections}} et {{answers}} reprises."
+  },
+  "packs": {
+    "button": "Packs…",
+    "title": "Packs d'apprentissage",
+    "close": "Fermer",
+    "explanation": "Un pack partage ce que RECOmuse a appris avec vous : vos réponses aux questions (pour les règles apprises) et, si vous le voulez, les corrections de vos parties, que reprendra celui qui ouvrira les mêmes partitions. Il ne contient aucune image ni partition. Envoyez le fichier aux autres membres de la fanfare : ils l'importeront ici.",
+    "share": "Partager",
+    "author": "Votre nom (facultatif)",
+    "includeScores": "Inclure les corrections de mes parties",
+    "create": "Créer un pack…",
+    "filter": "Pack d'apprentissage RECOmuse",
+    "exported": "Pack enregistré : {{path}} ({{answers}}, {{scores}}).",
+    "received": "Packs reçus",
+    "import": "Importer un pack…",
+    "imported": "Pack de {{author}} importé : ce qu'il contient sert dès maintenant.",
+    "none": "Aucun pack importé.",
+    "anonymous": "un membre",
+    "item": "Pack de {{author}}, créé le {{date}} : {{answers}}, {{scores}}.",
+    "remove": "Retirer",
+    "answers_zero": "aucune réponse",
+    "answers_one": "{{count}} réponse",
+    "answers_other": "{{count}} réponses",
+    "scores_zero": "aucune partie",
+    "scores_one": "{{count}} partie corrigée",
+    "scores_other": "{{count}} parties corrigées"
   }
 }

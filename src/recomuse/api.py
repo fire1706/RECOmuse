@@ -30,7 +30,7 @@ from recomuse.export.musescore import find_musescore
 from recomuse.importer import ScoreImportError
 from recomuse.importer.loading import IMAGE_EXTENSIONS
 from recomuse.instruments import parts as instruments
-from recomuse.learning import rules
+from recomuse.learning import packs, rules
 from recomuse.learning.corrections import CorrectionError, CorrectionService
 from recomuse.learning.journal import CorrectionJournal
 from recomuse.model.store import load_model
@@ -200,6 +200,48 @@ class Api:
             return {"rules": [rule.to_dict() for rule in rules.learned_rules(self._conn)]}
         return self._guarded(update)
 
+    # --- Packs d'apprentissage -------------------------------------------------------------
+
+    def choose_pack_file(self, save: bool, filter_label: str, default_name: str = "") -> str | None:
+        """Fenêtre « Enregistrer sous » (save) ou « Ouvrir » pour un pack ; renvoie le
+        fichier choisi, ou None."""
+        if self._window is None:
+            return None
+        import webview
+
+        file_types = (f"{filter_label} (*{packs.EXTENSION})",)
+        if save:
+            chosen = self._window.create_file_dialog(
+                webview.FileDialog.SAVE, save_filename=default_name + packs.EXTENSION,
+                file_types=file_types)
+        else:
+            chosen = self._window.create_file_dialog(
+                webview.FileDialog.OPEN, allow_multiple=False, file_types=file_types)
+        if not chosen:
+            return None
+        return str(chosen[0] if isinstance(chosen, list | tuple) else chosen)
+
+    def export_pack(self, path: str, author: str = "", include_scores: bool = True) -> dict:
+        """Écrit un pack d'apprentissage : {"path", "answers", "scores"}."""
+        return self._guarded(
+            lambda: packs.export_pack(self._conn, path, author, bool(include_scores)))
+
+    def import_pack(self, path: str) -> dict:
+        """Importe un pack reçu d'un autre membre : son résumé, ou {"error": code}."""
+        return self._guarded(lambda: packs.import_pack(self._conn, path))
+
+    def list_packs(self) -> list[dict]:
+        """Packs importés."""
+        with self._db:
+            return packs.list_packs(self._conn)
+
+    def remove_pack(self, pack_id: int) -> dict:
+        """Retire un pack ; renvoie la liste à jour."""
+        def remove():
+            packs.remove_pack(self._conn, pack_id)
+            return {"packs": packs.list_packs(self._conn)}
+        return self._guarded(remove)
+
     # --- Exports --------------------------------------------------------------------------
 
     def get_export_options(self, score_id: int) -> dict:
@@ -270,6 +312,9 @@ class Api:
             return {"error": "transposition_failed"}
         except exports.ExportError as error:
             log.exception("Export impossible")
+            return {"error": error.code}
+        except packs.PackError as error:
+            log.exception("Pack impossible")
             return {"error": error.code}
         except OSError:
             log.exception("Fichier impossible à écrire")

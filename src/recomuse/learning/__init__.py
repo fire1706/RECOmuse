@@ -5,6 +5,7 @@ packs d'apprentissage.
 - corrections.py : le service UNIQUE par lequel passe toute correction (journal + modèle) ;
 - rules.py       : règles apprises des réponses de l'utilisateur (même réponse, même doute) ;
 - memory.py      : empreinte des pages, pour reconnaître une partition déjà lue et
-                   reprendre ses corrections.
-Les packs d'apprentissage viendront à la tâche 13.
+                   reprendre ses corrections ;
+- packs.py       : packs d'apprentissage (fichiers .recomuse-pack) pour partager réponses
+                   et corrections entre membres de la fanfare, sans aucune image.
 """

@@ -12,6 +12,7 @@ Les règles ne sont pas écrites quelque part : elles se déduisent à chaque fo
 réponses enregistrées (table question_answers). Une réponse contraire de l'utilisateur
 affaiblit donc la règle tout de suite. L'utilisateur peut aussi en désactiver une
 (table rule_settings). Les réponses à taper (un nombre de mesures) ne font pas de règle.
+Les réponses reçues dans un pack d'apprentissage (learning/packs.py) comptent aussi.
 """
 
 import json
@@ -40,14 +41,16 @@ class Rule:
     key: str                  # signature en texte (identifiant de la règle)
     choice_id: str            # réponse appliquée (« accept », « keep »...)
     choice_label: str | None  # son étiquette, pour l'afficher (questions.choices.<label>)
-    evidence: int             # nombre de réponses de l'utilisateur à cette signature
+    evidence: int             # nombre de réponses à cette signature
     agreeing: int             # dont identiques à la règle
     enabled: bool
+    from_packs: int = 0       # réponses venues de packs d'apprentissage (d'autres membres)
 
     def to_dict(self) -> dict:
         return {"key": self.key, "signature": self.signature, "choice_id": self.choice_id,
                 "choice_label": self.choice_label, "evidence": self.evidence,
-                "agreeing": self.agreeing, "enabled": self.enabled}
+                "agreeing": self.agreeing, "enabled": self.enabled,
+                "from_packs": self.from_packs}
 
 
 # --- Signatures ---------------------------------------------------------------------------
@@ -102,15 +105,20 @@ def _shift(read: Any, proposed: Any) -> str:
 
 
 def learned_rules(conn: sqlite3.Connection) -> list[Rule]:
-    """Toutes les règles apprises (activées ou non), les plus sûres d'abord."""
+    """Toutes les règles apprises (activées ou non), les plus sûres d'abord. Les réponses
+    des packs d'apprentissage importés comptent comme celles de l'utilisateur."""
     rows = conn.execute(
-        "SELECT signature, choice_id, choice_label, score_id FROM question_answers "
-        "WHERE undone = 0 AND answered_by = 'user' AND signature IS NOT NULL ORDER BY id")
+        "SELECT signature, choice_id, choice_label, 'local:' || score_id FROM question_answers"
+        " WHERE undone = 0 AND answered_by = 'user' AND signature IS NOT NULL"
+        " UNION ALL SELECT signature, choice_id, choice_label,"
+        " 'pack:' || pack_id || ':' || score_key FROM pack_answers")
     answers: dict[str, list[tuple[str, str | None]]] = defaultdict(list)
-    scores: dict[str, set[int]] = defaultdict(set)
-    for key, choice_id, label, score_id in rows:
+    scores: dict[str, set[str]] = defaultdict(set)
+    from_packs: Counter[str] = Counter()
+    for key, choice_id, label, score in rows:
         answers[key].append((choice_id, label))
-        scores[key].add(score_id)
+        scores[key].add(score)
+        from_packs[key] += score.startswith("pack:")
     disabled = {row[0] for row in conn.execute(
         "SELECT signature FROM rule_settings WHERE enabled = 0")}
     rules = []
@@ -121,7 +129,7 @@ def learned_rules(conn: sqlite3.Connection) -> list[Rule]:
             continue
         label = next(lbl for c, lbl in reversed(given) if c == choice_id)
         rules.append(Rule(json.loads(key), key, choice_id, label, len(given), agreeing,
-                          key not in disabled))
+                          key not in disabled, from_packs[key]))
     return sorted(rules, key=lambda r: (-r.agreeing, r.key))
 
 

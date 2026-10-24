@@ -22,7 +22,16 @@ export interface ScoreSummary {
   pages: number[]
   measure_count: number
   /** Partie déjà lue et corrigée : corrections et réponses reprises (à l'ouverture). */
-  memory?: { from: number; applied: number; skipped: number; answers: number; read_at: string }
+  memory?: {
+    from?: number
+    applied: number
+    skipped: number
+    answers: number
+    read_at: string
+    /** Corrections venues d'un pack d'apprentissage (d'un autre membre). */
+    from_pack?: number
+    author?: string | null
+  }
 }
 
 /** Une réponse possible à une question. */
@@ -211,6 +220,18 @@ export interface Rule {
   evidence: number
   agreeing: number
   enabled: boolean
+  /** Réponses venues de packs d'apprentissage. */
+  from_packs: number
+}
+
+/** Un pack d'apprentissage importé (voir src/recomuse/learning/packs.py). */
+export interface PackInfo {
+  id: number
+  author: string | null
+  created_at: string
+  imported_at: string
+  answers: number
+  scores: number
 }
 
 /** Erreur renvoyée par le moteur : un code traduit par errors.<code>. */
@@ -254,6 +275,15 @@ export interface PythonApi {
   export_score(scoreId: number, format: ExportFormat, path: string): Promise<ExportResult | EngineError>
   get_rules(): Promise<Rule[]>
   set_rule_enabled(key: string, enabled: boolean): Promise<{ rules: Rule[] } | EngineError>
+  choose_pack_file(save: boolean, filterLabel: string, defaultName: string): Promise<string | null>
+  export_pack(
+    path: string,
+    author: string,
+    includeScores: boolean,
+  ): Promise<{ path: string; answers: number; scores: number } | EngineError>
+  import_pack(path: string): Promise<PackInfo | EngineError>
+  list_packs(): Promise<PackInfo[]>
+  remove_pack(packId: number): Promise<{ packs: PackInfo[] } | EngineError>
 }
 
 /** Vrai si la réponse du moteur est une erreur. */

@@ -116,7 +116,10 @@
     "edit_failed": "This change could not be made.",
     "transposition_failed": "This transposition could not be made.",
     "write_failed": "The file could not be written (protected folder, disk full?).",
-    "unknown_format": "Unknown export format."
+    "unknown_format": "Unknown export format.",
+    "not_a_pack": "This file is not a RECOmuse learning pack.",
+    "pack_too_new": "This pack was made by a newer version of RECOmuse: update RECOmuse.",
+    "pack_already_imported": "This pack has already been imported."
   },
   "scan": {
     "loading": "Loading the page…",
@@ -380,7 +383,9 @@
         "accept": "make it a rest of several bars",
         "keep": "keep a single bar"
       }
-    }
+    },
+    "fromPacks_one": "(including {{count}} from a pack)",
+    "fromPacks_other": "(including {{count}} from packs)"
   },
   "memory": {
     "replayed": "{{name}}: already read on {{date}}; {{corrections}} and {{answers}} reused.",
@@ -391,6 +396,32 @@
     "answers_one": "{{count}} answer",
     "answers_other": "{{count}} answers",
     "skipped_one": "({{count}} correction no longer applied.)",
-    "skipped_other": "({{count}} corrections no longer applied.)"
+    "skipped_other": "({{count}} corrections no longer applied.)",
+    "fromPack": "{{name}}: already corrected by {{author}} (pack); {{corrections}} and {{answers}} reused."
+  },
+  "packs": {
+    "button": "Packs…",
+    "title": "Learning packs",
+    "close": "Close",
+    "explanation": "A pack shares what RECOmuse has learned with you: your answers to the questions (for the learned rules) and, if you wish, the corrections of your parts, which anyone opening the same scores will reuse. It contains no images and no scores. Send the file to the other members of the band: they will import it here.",
+    "share": "Share",
+    "author": "Your name (optional)",
+    "includeScores": "Include the corrections of my parts",
+    "create": "Create a pack…",
+    "filter": "RECOmuse learning pack",
+    "exported": "Pack saved: {{path}} ({{answers}}, {{scores}}).",
+    "received": "Received packs",
+    "import": "Import a pack…",
+    "imported": "Pack from {{author}} imported: its content is used from now on.",
+    "none": "No pack imported.",
+    "anonymous": "a member",
+    "item": "Pack from {{author}}, created on {{date}}: {{answers}}, {{scores}}.",
+    "remove": "Remove",
+    "answers_zero": "no answers",
+    "answers_one": "{{count}} answer",
+    "answers_other": "{{count}} answers",
+    "scores_zero": "no parts",
+    "scores_one": "{{count}} corrected part",
+    "scores_other": "{{count}} corrected parts"
   }
 }

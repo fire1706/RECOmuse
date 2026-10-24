@@ -18,6 +18,7 @@ const noteRule: Rule = {
   evidence: 5,
   agreeing: 5,
   enabled: true,
+  from_packs: 2,
 }
 
 describe('RulesDialog', () => {
@@ -33,7 +34,7 @@ describe('RulesDialog', () => {
       await screen.findByText('Note lue une octave à côté de sa position sur la portée (au-dessus de la portée)'),
     ).toBeInTheDocument()
     expect(screen.getByText(/prendre la note d'après sa position/)).toBeInTheDocument()
-    expect(screen.getByText('5 réponses identiques sur 5')).toBeInTheDocument()
+    expect(screen.getByText('5 réponses identiques sur 5 (dont 2 venues de packs)')).toBeInTheDocument()
     const box = screen.getByRole('checkbox')
     expect(box).toBeChecked()
     await act(async () => {

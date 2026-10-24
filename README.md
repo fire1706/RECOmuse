@@ -44,6 +44,9 @@ Apprentissage : quand l'utilisateur répond toujours de la même façon à un m�
 (3 fois au moins, sur 2 partitions au moins), RECOmuse répond ensuite lui-même (« Règles
 apprises… » pour les voir et les désactiver). Une partition déjà lue et corrigée (mêmes
 pages) reprend ses corrections quand on la rouvre.
+Packs d'apprentissage : « Packs… » crée un fichier .recomuse-pack (réponses et corrections,
+sans aucune image ni partition) à envoyer aux autres membres, qui l'importent : leurs
+règles apprises en profitent, et la même partie ouverte chez eux reprend les corrections.
 
 Tests : `.venv\Scripts\python -m pytest` à la racine, `npm test` dans `ui/`.
 Tests lents, sur demande : `-m corpus` (vraies partitions de `tests/corpus/` ou `test/corpus/`)

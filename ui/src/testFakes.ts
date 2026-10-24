@@ -78,6 +78,11 @@ export function fakeApi(overrides: Partial<PythonApi> = {}, info: AppInfo = fake
     export_score: async () => ({ error: 'write_failed' }),
     get_rules: async () => [],
     set_rule_enabled: async () => ({ rules: [] }),
+    choose_pack_file: async () => null,
+    export_pack: async () => ({ error: 'write_failed' }),
+    import_pack: async () => ({ error: 'not_a_pack' }),
+    list_packs: async () => [],
+    remove_pack: async () => ({ packs: [] }),
     ...overrides,
   }
 }

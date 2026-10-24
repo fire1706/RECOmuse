@@ -70,7 +70,10 @@ export default function RulesDialog({ api, onClose }: RulesDialogProps) {
                   <span>
                     <strong>{ruleContext(rule, t)}</strong> → {ruleAnswer(rule, t)}
                     <br />
-                    <small>{t('rules.evidence', { count: rule.evidence, agreeing: rule.agreeing })}</small>
+                    <small>
+                      {t('rules.evidence', { count: rule.evidence, agreeing: rule.agreeing })}
+                      {rule.from_packs > 0 && ` ${t('rules.fromPacks', { count: rule.from_packs })}`}
+                    </small>
                   </span>
                 </label>
               </li>
