@@ -24,7 +24,7 @@
   },
   "open": {
     "button": "Open a score…",
-    "filter": "Scores (PDF or image)",
+    "filter": "Scores PDF or image",
     "stage": {
       "import": "Preparing the pages…",
       "recognition": "Reading the score… This can take a minute or two per scanned page.",
@@ -99,6 +99,7 @@
   "errors": {
     "unexpected": "An unexpected error occurred. Try again; if it happens again, please report it.",
     "busy": "A score is already being read.",
+    "dialog_failed": "The Open window could not be shown. Try again; if it happens again, please report it.",
     "question_failed": "This answer could not be saved.",
     "file_not_found": "The file cannot be found.",
     "unsupported_format": "This type of file is not supported (PDF or image only).",
@@ -410,7 +411,7 @@
     "author": "Your name (optional)",
     "includeScores": "Include the corrections of my parts",
     "create": "Create a pack…",
-    "filter": "RECOmuse learning pack",
+    "filter": "RECOmuse packs",
     "exported": "Pack saved: {{path}} ({{answers}}, {{scores}}).",
     "received": "Received packs",
     "import": "Import a pack…",

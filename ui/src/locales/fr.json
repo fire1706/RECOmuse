@@ -24,7 +24,7 @@
   },
   "open": {
     "button": "Ouvrir une partition…",
-    "filter": "Partitions (PDF ou image)",
+    "filter": "Partitions PDF ou image",
     "stage": {
       "import": "Préparation des pages…",
       "recognition": "Lecture de la partition… Cela peut prendre une ou deux minutes par page scannée.",
@@ -99,6 +99,7 @@
   "errors": {
     "unexpected": "Une erreur inattendue s'est produite. Réessayez ; si elle revient, signalez-la.",
     "busy": "Une partition est déjà en cours de lecture.",
+    "dialog_failed": "La fenêtre « Ouvrir » n'a pas pu s'ouvrir. Réessayez ; si cela revient, signalez-le.",
     "question_failed": "Cette réponse n'a pas pu être enregistrée.",
     "file_not_found": "Le fichier est introuvable.",
     "unsupported_format": "Ce type de fichier n'est pas pris en charge (PDF ou image seulement).",
@@ -410,7 +411,7 @@
     "author": "Votre nom (facultatif)",
     "includeScores": "Inclure les corrections de mes parties",
     "create": "Créer un pack…",
-    "filter": "Pack d'apprentissage RECOmuse",
+    "filter": "Packs RECOmuse",
     "exported": "Pack enregistré : {{path}} ({{answers}}, {{scores}}).",
     "received": "Packs reçus",
     "import": "Importer un pack…",

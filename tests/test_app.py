@@ -91,3 +91,44 @@ def test_self_check(tmp_path, monkeypatch):
     assert saved["score"]["file"] == "partie.pdf"
     broken = selfcheck.run(tmp_path / "absent.pdf")
     assert broken["score"]["error"].startswith("ScoreImportError")
+
+
+# --- Filtres des fenêtres « Ouvrir » / « Enregistrer sous » --------------------------------
+
+LOCALES = Path(__file__).resolve().parents[1] / "ui" / "src" / "locales"
+
+
+def test_file_filter_is_accepted_by_pywebview():
+    from webview.util import parse_file_type
+
+    from recomuse.api import OPEN_EXTENSIONS, file_filter
+
+    # Parenthèses et apostrophe : refusées par pywebview (la fenêtre ne s'ouvrait pas).
+    (open_filter,) = file_filter("Partitions (PDF ou image)", OPEN_EXTENSIONS)
+    assert parse_file_type(open_filter) == ("Partitions PDF ou image",
+                                            ";".join(f"*{e}" for e in OPEN_EXTENSIONS))
+    # Extension avec un tiret : remplacée par « tous les fichiers ».
+    (pack_filter,) = file_filter("Pack d'apprentissage", [".recomuse-pack"])
+    assert parse_file_type(pack_filter) == ("Pack d apprentissage", "*.*")
+
+
+def test_every_translated_filter_label_is_accepted():
+    """Chaque libellé de filtre de l'interface, dans chaque langue, donne un filtre valide."""
+    import json
+
+    from webview.util import parse_file_type
+
+    from recomuse.api import OPEN_EXTENSIONS, file_filter
+    from recomuse.export import files as exports
+    from recomuse.learning import packs
+
+    for locale in LOCALES.glob("*.json"):
+        texts = json.loads(locale.read_text(encoding="utf-8"))
+        cases = [(texts["open"]["filter"], OPEN_EXTENSIONS),
+                 (texts["packs"]["filter"], [packs.EXTENSION])]
+        cases += [(texts["export"]["filters"][fmt], [ext])
+                  for fmt, ext in exports.FORMATS.items()]
+        for label, extensions in cases:
+            name, _ = parse_file_type(file_filter(label, extensions)[0])
+            # Les libellés sont choisis pour passer tels quels (rien d'enlevé).
+            assert name == label, (locale.name, label)

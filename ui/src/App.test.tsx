@@ -130,6 +130,18 @@ describe('groupByPiece', () => {
     expect(await screen.findByText('Ce PDF est protégé par un mot de passe.')).toBeInTheDocument()
   })
 
+  it("signale une fenêtre « Ouvrir » qui n'a pas pu s'ouvrir", async () => {
+    const api = fakeApi({
+      choose_file: async () => {
+        throw new Error('not a valid file filter')
+      },
+    })
+    render(<App connect={async () => api} />)
+    await screen.findByText(/Moteur prêt/)
+    fireEvent.click(screen.getByRole('button', { name: 'Ouvrir une partition…' }))
+    expect(await screen.findByText(/La fenêtre « Ouvrir » n'a pas pu s'ouvrir/)).toBeInTheDocument()
+  })
+
   it("ne fait rien si l'utilisateur ferme la fenêtre « Ouvrir »", async () => {
     const open_file = vi.fn()
     render(<App connect={async () => fakeApi({ open_file })} />)

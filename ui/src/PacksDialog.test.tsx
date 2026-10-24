@@ -28,7 +28,7 @@ describe('PacksDialog', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Créer un pack…' }))
     })
-    expect(choose_pack_file).toHaveBeenCalledWith(true, "Pack d'apprentissage RECOmuse", 'RECOmuse - Marc')
+    expect(choose_pack_file).toHaveBeenCalledWith(true, 'Packs RECOmuse', 'RECOmuse - Marc')
     expect(export_pack).toHaveBeenCalledWith('C:/Packs/RECOmuse - Marc.recomuse-pack', 'Marc', false)
     expect(screen.getByRole('status')).toHaveTextContent('7 réponses, 1 partie corrigée')
   })

@@ -147,7 +147,14 @@ export default function App({ connect = waitForBridge }: AppProps) {
   async function openScore() {
     if (engine.kind !== 'connected') return
     const { api } = engine
-    const path = await api.choose_file(t('open.filter'))
+    let path: string | null
+    try {
+      path = await api.choose_file(t('open.filter'))
+    } catch {
+      // La fenêtre « Ouvrir » n'a pas pu s'ouvrir : le dire, plutôt que ne rien faire.
+      setOpenError('dialog_failed')
+      return
+    }
     if (!path) return
     setOpenError(null)
     setOpenedParts(null)

@@ -19,6 +19,7 @@ Règles :
 
 import logging
 import platform
+import re
 import sqlite3
 import sys
 import threading
@@ -42,6 +43,20 @@ log = logging.getLogger(__name__)
 
 # Extensions proposées dans la fenêtre « Ouvrir ».
 OPEN_EXTENSIONS = (".pdf", *sorted(IMAGE_EXTENSIONS))
+
+
+def file_filter(label: str, extensions: tuple[str, ...] | list[str]) -> tuple[str]:
+    """Filtre de fichiers des fenêtres « Ouvrir » et « Enregistrer sous » de pywebview.
+
+    pywebview refuse un nom de filtre qui contient autre chose que des lettres, des
+    chiffres et des espaces (parenthèses, apostrophe...), et une extension avec un tiret
+    (« .recomuse-pack ») : il lève alors une erreur et la fenêtre ne s'ouvre PAS. Ces
+    caractères sont donc retirés du nom, et une extension refusée devient « *.* » (tous
+    les fichiers ; le contenu du fichier choisi est de toute façon vérifié ensuite).
+    """
+    name = " ".join(re.sub(r"[^\w ]+", " ", label).split()) or "RECOmuse"
+    patterns = [f"*{ext}" if re.fullmatch(r"\.\w+", ext) else "*.*" for ext in extensions]
+    return (f"{name} ({';'.join(dict.fromkeys(patterns))})",)
 
 
 class LibraryError(RuntimeError):
@@ -93,10 +108,9 @@ class Api:
         # Importé ici seulement : les tests n'ouvrent pas de fenêtre.
         import webview
 
-        patterns = ";".join(f"*{ext}" for ext in OPEN_EXTENSIONS)
         chosen = self._window.create_file_dialog(
             webview.FileDialog.OPEN, allow_multiple=False,
-            file_types=(f"{filter_label} ({patterns})",))
+            file_types=file_filter(filter_label, OPEN_EXTENSIONS))
         return str(chosen[0]) if chosen else None
 
     def open_file(self, path: str) -> dict:
@@ -242,7 +256,7 @@ class Api:
             return None
         import webview
 
-        file_types = (f"{filter_label} (*{packs.EXTENSION})",)
+        file_types = file_filter(filter_label, [packs.EXTENSION])
         if save:
             chosen = self._window.create_file_dialog(
                 webview.FileDialog.SAVE, save_filename=default_name + packs.EXTENSION,
@@ -299,7 +313,7 @@ class Api:
         extension = exports.FORMATS[fmt]
         chosen = self._window.create_file_dialog(
             webview.FileDialog.SAVE, save_filename=default_name + extension,
-            file_types=(f"{filter_label} (*{extension})",))
+            file_types=file_filter(filter_label, [extension]))
         if not chosen:
             return None
         return str(chosen[0] if isinstance(chosen, list | tuple) else chosen)
