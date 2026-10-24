@@ -108,6 +108,21 @@ def test_steps_done():
     assert audiveris.steps_done(1, "PAGE") == len(audiveris.AUDIVERIS_STEPS) - 1
 
 
+def test_crashed_sheets_are_read_from_the_log(tmp_path):
+    # Extrait d'un vrai journal d'Audiveris 5.11 (corpus : Rimsky-Korsakov).
+    log = tmp_path / "livre-20261024T1031.log"
+    log.write_text(
+        "2026-10-24 10:31:20,935 WARN [livre#1]                 Book.java:2044 | Error "
+        "processing stub java.lang.RuntimeException: java.lang.NullPointerException\n"
+        "2026-10-24 10:31:59,983 WARN [livre#4]        SentenceInter.java:507  | Error in "
+        "link SentenceInter#10835\n"
+        "2026-10-24 10:32:00,517 INFO [livre]                  Book.java:596  | Could not "
+        "export since transcription did not complete successfully\n", encoding="utf-8")
+    assert audiveris.crashed_sheets(log) == [1]
+    assert audiveris.crashed_sheets(None) == []
+    assert audiveris.crashed_sheets(tmp_path / "absent.log") == []
+
+
 def test_movement_files_are_in_numeric_order(tmp_path):
     for n in (10, 2, 1):
         (tmp_path / f"livre.mvt{n}.mxl").write_bytes(b"")

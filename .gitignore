@@ -33,6 +33,8 @@ test/corpus/
 *.mscz
 *.mid
 *.midi
+# Packs d'apprentissage : corrections de partitions de l'utilisateur
+*.recomuse-pack
 
 # Exception : icônes et images propres à l'interface (créées par le projet)
 !ui/public/icons/*.png

@@ -114,6 +114,27 @@ def test_vector_pdf_header_is_read_from_the_pdf_text(tmp_path, monkeypatch, fake
     assert result.to_dict()["vector"]["measure_count"] == 24
 
 
+def test_pages_where_audiveris_crashes_are_skipped(imported, monkeypatch, fake_audiveris):
+    # Audiveris plante sur la 1re feuille (page 2) : relancé sur la page 3 seule.
+    monkeypatch.setenv("FAKE_AUDIVERIS_MODE", "crash_first")
+    monkeypatch.setenv("FAKE_AUDIVERIS_SHEETS", "1")
+    set_tools(monkeypatch, audiveris=fake_audiveris)
+    result = recognize_score(imported)
+    assert result.run.book.sheet_pages == [3]
+    assert result.skipped_pages == [2]
+    assert "audiveris_pages_skipped" in result.warnings
+    assert result.to_dict()["skipped_pages"] == [2]
+
+
+def test_audiveris_failure_without_crashed_page_is_an_error(imported, monkeypatch,
+                                                             fake_audiveris):
+    monkeypatch.setenv("FAKE_AUDIVERIS_MODE", "fail")
+    set_tools(monkeypatch, audiveris=fake_audiveris)
+    with pytest.raises(AudiverisError) as info:
+        recognize_score(imported)
+    assert info.value.code == "audiveris_failed"
+
+
 def test_audiveris_is_required(imported, monkeypatch):
     set_tools(monkeypatch, audiveris=None)
     with pytest.raises(ToolNotFoundError) as info:

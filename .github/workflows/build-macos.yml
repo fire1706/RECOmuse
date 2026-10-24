@@ -1,0 +1,50 @@
+# Fabrique l'application macOS de RECOmuse (.dmg), pour les puces Apple et Intel.
+#
+# Se lance :
+# - à la main, depuis l'onglet « Actions » de GitHub (bouton « Run workflow ») ;
+# - quand une étiquette de version est poussée (git tag v0.1.0 puis git push --tags).
+# Les .dmg sont à télécharger en bas de la page de l'exécution (« Artifacts »).
+# L'application n'est pas signée : au premier lancement, clic droit → Ouvrir.
+name: Application macOS
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-14 : puces Apple (arm64) ; macos-13 : puces Intel (x86_64).
+        runner: [macos-14, macos-13]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Dépendances Python
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Tests (sans le corpus)
+        run: python -m pytest -q
+
+      - name: Fabrication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: sh packaging/build_macos.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RECOmuse-macos-${{ matrix.runner }}
+          path: dist/*.dmg

@@ -21,6 +21,8 @@ dependencies = [
 dev = [
     "pytest>=8",
     "ruff>=0.6",
+    # Fabrication des installateurs (packaging/).
+    "pyinstaller>=6.10",
 ]
 
 [project.scripts]

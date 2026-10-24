@@ -26,6 +26,7 @@ from recomuse.recognition.audiveris import (
     AudiverisRun,
     ProgressCallback,
     build_book_image,
+    crashed_sheets,
     run_audiveris,
 )
 from recomuse.recognition.header import (
@@ -43,6 +44,7 @@ RecognitionWarning = Literal[
     "ocr_unavailable",           # Tesseract absent : en-tête non lu par RECOmuse
     "ocr_languages_missing",     # langues absentes : textes mal lus, voire pas du tout
     "ocr_failed",                # Tesseract a échoué sur l'en-tête
+    "audiveris_pages_skipped",   # Audiveris a planté sur des pages, lues sans elles
 ]
 
 # Sous-dossier des résultats d'Audiveris dans le dossier de travail de la partition.
@@ -62,6 +64,8 @@ class RecognitionResult:
     # En-tête de chaque page de musique (n° de page → titre, instrument...) : un PDF peut
     # contenir plusieurs parties à la suite (voir model/split.py).
     page_headers: dict[int, HeaderInfo] = field(default_factory=dict)
+    # Pages d'origine sur lesquelles Audiveris a planté : laissées de côté (non lues).
+    skipped_pages: list[int] = field(default_factory=list)
 
     @property
     def measure_count(self) -> int:
@@ -88,6 +92,7 @@ class RecognitionResult:
             ],
             "header": asdict(self.header),
             "warnings": list(self.warnings),
+            "skipped_pages": list(self.skipped_pages),
             "vector": self.vector.to_dict() if self.vector else None,
         }
 
@@ -138,10 +143,13 @@ def recognize_score(score: ImportedScore, on_progress: ProgressCallback | None =
                      if audiveris_for_vector_pages or p.page_number not in read_by_vector]
     run = None
     movements: list[MovementSummary] = []
+    skipped: list[int] = []
     if for_audiveris:
         audiveris = tools.require(status.audiveris, "audiveris_not_found")
-        book = build_book_image(for_audiveris, output_dir / f"{BOOK_NAME}.tif")
-        run = run_audiveris(audiveris, book, output_dir, status.tessdata, on_progress)
+        run, skipped = _run_skipping_crashes(audiveris, for_audiveris, output_dir,
+                                             status.tessdata, on_progress)
+        if skipped:
+            warnings.append("audiveris_pages_skipped")
         # 4. Résumé de la musique, et textes d'Audiveris pour compléter l'en-tête.
         movements = [summarize_movement(path) for path in run.movement_paths]
         if movements:
@@ -151,7 +159,32 @@ def recognize_score(score: ImportedScore, on_progress: ProgressCallback | None =
 
     return RecognitionResult(run=run, movements=movements, header=header,
                              header_lines=header_lines, warnings=warnings, vector=vector,
-                             page_headers=page_headers)
+                             page_headers=page_headers, skipped_pages=skipped)
+
+
+def _run_skipping_crashes(audiveris: Path, pages: list, output_dir: Path,
+                          tessdata: Path | None, on_progress: ProgressCallback | None
+                          ) -> tuple[AudiverisRun, list[int]]:
+    """Lance Audiveris ; s'il plante sur certaines pages, le relance sans elles.
+
+    Audiveris a des erreurs internes sur certaines pages (vu sur le corpus réel), et
+    refuse alors d'exporter tout le livre : mieux vaut lire les autres pages que perdre
+    toute la partition. Renvoie le passage réussi et les pages laissées de côté.
+    """
+    skipped: list[int] = []
+    while True:
+        book = build_book_image(pages, output_dir / f"{BOOK_NAME}.tif")
+        try:
+            return run_audiveris(audiveris, book, output_dir, tessdata, on_progress), skipped
+        except AudiverisError as error:
+            crashed = {book.sheet_pages[sheet - 1] for sheet in crashed_sheets(error.log_path)
+                       if sheet <= len(book.sheet_pages)}
+            remaining = [p for p in pages if p.page_number not in crashed]
+            # Rien à retirer (autre panne) ou plus aucune page : l'erreur reste.
+            if error.code != "audiveris_failed" or not crashed or not remaining:
+                raise
+            skipped = sorted([*skipped, *crashed])
+            pages = remaining
 
 
 def _page_header_lines(page, vector: VectorScore | None, status, output_dir: Path,

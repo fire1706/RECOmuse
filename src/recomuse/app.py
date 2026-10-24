@@ -7,6 +7,9 @@ Deux modes :
 """
 
 import argparse
+import json
+import logging
+import sys
 from pathlib import Path
 
 from recomuse import paths
@@ -14,6 +17,9 @@ from recomuse.api import Api
 from recomuse.storage import database
 
 WINDOW_TITLE = "RECOmuse"
+
+# Fichier du journal, dans le dossier des données (paths.data_dir).
+LOG_FILENAME = "recomuse.log"
 
 # Adresse du serveur de développement Vite (voir ui/vite.config.ts).
 DEV_SERVER_URL = "http://localhost:5173"
@@ -54,6 +60,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="affiche le serveur de développement Vite et active les outils de débogage",
     )
+    parser.add_argument(
+        "--check",
+        nargs="?",
+        const="",
+        metavar="PARTITION",
+        help="diagnostic sans fenêtre (outils trouvés ; lecture complète d'une partition)",
+    )
     return parser.parse_args(argv)
 
 
@@ -64,6 +77,19 @@ def main(argv: list[str] | None = None) -> None:
     import webview
 
     args = parse_args(argv)
+    # Journal du logiciel (erreurs inattendues...) : l'application installée n'a pas de
+    # console, il est donc écrit dans un fichier du dossier des données.
+    logging.basicConfig(filename=paths.data_dir() / LOG_FILENAME, level=logging.INFO,
+                        format="%(asctime)s %(levelname)s %(name)s : %(message)s",
+                        encoding="utf-8")
+
+    if args.check is not None:
+        # Diagnostic : pas de fenêtre ; le rapport va dans self-check.json.
+        from recomuse import selfcheck
+
+        report = selfcheck.run(Path(args.check) if args.check else None)
+        print(json.dumps(report, ensure_ascii=False, indent=1))
+        sys.exit(0 if report["ok"] else 1)
 
     db_path = paths.database_path()
     conn = database.connect(db_path)

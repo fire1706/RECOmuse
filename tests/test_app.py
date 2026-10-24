@@ -1,6 +1,7 @@
 """Tests du point d'entrée et du pont Python ↔ interface (sans ouvrir de fenêtre)."""
 
 import sys
+from pathlib import Path
 
 from recomuse import __version__, app
 from recomuse.api import Api
@@ -59,3 +60,34 @@ def test_fallback_page_when_ui_not_built(tmp_path):
 def test_parse_args():
     assert app.parse_args([]).dev is False
     assert app.parse_args(["--dev"]).dev is True
+
+
+def test_parse_check_option():
+    assert app.parse_args([]).check is None
+    assert app.parse_args(["--check"]).check == ""
+    assert app.parse_args(["--check", "partie.pdf"]).check == "partie.pdf"
+
+
+def test_self_check(tmp_path, monkeypatch):
+    """Diagnostic : outils trouvés (ici aucun), et lecture complète d'une partition."""
+    import json
+
+    from recomuse import selfcheck
+    from recomuse.recognition import tools
+    from recomuse.recognition.tools import ToolsStatus
+
+    from synthetic import part_pdf
+
+    monkeypatch.setattr(tools, "check_tools", lambda: ToolsStatus(
+        audiveris=None, tesseract=None, tessdata=None, languages=[],
+        missing_languages=list(tools.OCR_LANGUAGES)))
+    report = selfcheck.run(part_pdf(tmp_path / "partie.pdf"))
+    assert report["installed"] is False and report["audiveris"] == {"path": None,
+                                                                    "bundled": False}
+    assert report["ok"] is False                      # outils absents
+    [part] = report["score"]["parts"]
+    assert report["score"]["error"] is None and part["measures"] == 24 and part["exported"]
+    saved = json.loads(Path(report["report_path"]).read_text(encoding="utf-8"))
+    assert saved["score"]["file"] == "partie.pdf"
+    broken = selfcheck.run(tmp_path / "absent.pdf")
+    assert broken["score"]["error"].startswith("ScoreImportError")

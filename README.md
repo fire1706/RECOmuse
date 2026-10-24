@@ -76,6 +76,32 @@ parties d'un même PDF, puis comparaison des parties d'un même morceau).
 
 Sur macOS, remplacer `py -3.12` par `python3.12` et `.venv\Scripts\python` par `.venv/bin/python`.
 
+## Installateurs
+
+Windows (sur un PC où Node.js, Inno Setup 6, Audiveris, Tesseract et ses langues sont
+installés, et PyInstaller dans le .venv) :
+
+```bash
+.venv\Scripts\python packaging\build_windows.py
+```
+
+Il produit `dist\RECOmuse-<version>-installation.exe` : un seul installateur, pour
+l'utilisateur seul (pas besoin d'être administrateur), qui contient Audiveris (avec son
+Java), Tesseract et les langues fra, nld, eng, deu. MuseScore reste facultatif (sans lui,
+l'export MuseScore écrit un MusicXML). La désinstallation garde les données de
+l'utilisateur (`%LOCALAPPDATA%\RECOmuse` : base, ce que le logiciel a appris).
+
+macOS : le workflow GitHub Actions « Application macOS » (`.github/workflows/build-macos.yml`)
+fabrique un .dmg pour les puces Apple et pour les puces Intel, à la main depuis l'onglet
+Actions ou en poussant une étiquette `v*`. Sur un Mac, `sh packaging/build_macos.sh` fait de
+même. L'application n'est pas signée : au premier lancement, clic droit sur RECOmuse puis
+« Ouvrir ».
+
+Le journal du logiciel installé est `recomuse.log`, dans le dossier des données.
+
+Rapport sur tout le corpus local (chaîne complète, sans rien modifier dans le corpus) :
+`.venv\Scripts\python scripts\corpus_report.py [--pages 4]` → `build\corpus-report.md`.
+
 ## Structure
 
 - `src/recomuse/` : moteur Python (un dossier par module, voir `CLAUDE.md`)

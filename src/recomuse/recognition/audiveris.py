@@ -56,6 +56,10 @@ BOOK_NAME = "livre"
 # Ligne de progression du journal : « [livre#3] StepMonitoring 98 | HEADS ».
 _STEP_LINE = re.compile(r"\[[^\]#]+#(?P<sheet>\d+)\]\s+StepMonitoring\s+\d+\s+\|\s+(?P<step>[A-Z_]+)")
 
+# Feuille abandonnée sur une erreur interne d'Audiveris :
+# « [livre#1]  Book.java:2044 | Error processing stub java.lang.RuntimeException: ... ».
+_STUB_ERROR = re.compile(r"\[[^\]#]+#(?P<sheet>\d+)\][^|]*\|\s*Error processing stub")
+
 # Numéro de mouvement dans un nom de fichier : « livre.mvt12.mxl » → 12.
 _MOVEMENT_NUMBER = re.compile(r"\.mvt(\d+)\.mxl$")
 
@@ -173,6 +177,19 @@ def parse_progress_line(line: str) -> tuple[int, str] | None:
 def steps_done(sheet: int, step: str) -> int:
     """Nombre d'étapes terminées quand la feuille `sheet` commence l'étape `step`."""
     return (sheet - 1) * len(AUDIVERIS_STEPS) + AUDIVERIS_STEPS.index(step)
+
+
+def crashed_sheets(log_path: Path | None) -> list[int]:
+    """Feuilles sur lesquelles Audiveris a planté (erreur interne, vue dans son journal).
+
+    Une seule feuille plantée suffit pour qu'Audiveris refuse d'exporter tout le livre
+    (« transcription did not complete successfully ») : voir pipeline.py, qui relance
+    alors Audiveris sans ces pages.
+    """
+    if log_path is None or not log_path.is_file():
+        return []
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    return sorted({int(m.group("sheet")) for m in _STUB_ERROR.finditer(text)})
 
 
 def movement_files(output_dir: Path, book_name: str = BOOK_NAME) -> list[Path]:

@@ -4,7 +4,9 @@ Comportement choisi par la variable d'environnement FAKE_AUDIVERIS_MODE :
 - « ok » (par défaut) : deux mouvements, sur les feuilles 1 et 2 ;
 - « fail »  : s'arrête avec le code 1 ;
 - « hang »  : ne finit jamais (pour tester le délai maximal) ;
-- « empty » : se termine sans produire de MusicXML.
+- « empty » : se termine sans produire de MusicXML ;
+- « crash_first » : au premier lancement, plante sur la feuille 1 (comme le vrai Audiveris
+  sur certaines pages) et s'arrête avec le code 1 ; les lancements suivants réussissent.
 Le nombre de feuilles est lu dans FAKE_AUDIVERIS_SHEETS (2 par défaut).
 """
 
@@ -49,6 +51,7 @@ def main() -> int:
     book = Path(args[args.index("--") + 1])
     mode = os.environ.get("FAKE_AUDIVERIS_MODE", "ok")
     sheets = int(os.environ.get("FAKE_AUDIVERIS_SHEETS", "2"))
+    first_run = not (output_dir / "fake-args.txt").exists()
     # Les arguments reçus, pour que les tests puissent les vérifier.
     (output_dir / "fake-args.txt").write_text("\n".join(args), encoding="utf-8")
 
@@ -57,7 +60,12 @@ def main() -> int:
     for sheet in range(1, sheets + 1):
         for step in STEPS:
             print(f"INFO  [{book.stem}#{sheet}]   StepMonitoring 98   | {step}", flush=True)
-    (output_dir / f"{book.stem}-20261023T1200.log").write_text("journal", encoding="utf-8")
+    log = output_dir / f"{book.stem}-20261023T1200.log"
+    if mode == "crash_first" and first_run:
+        log.write_text(f"WARN [{book.stem}#1]  Book.java:2044 | Error processing stub "
+                       "java.lang.RuntimeException: NullPointerException\n", encoding="utf-8")
+        return 1
+    log.write_text("journal", encoding="utf-8")
     if mode == "fail":
         return 1
     (output_dir / f"{book.stem}.omr").write_bytes(b"omr")
