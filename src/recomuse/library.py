@@ -167,7 +167,28 @@ def summary(score_id: int, model: ScoreModel) -> dict:
         "instruments": [g[0].name for g in conductor.instrument_groups(model)]
         if conductor.is_conductor(model) else [],
         "derived": model.derived,
+        "warnings": reading_warnings(model),
     }
+
+
+# Avertissements de lecture montrés à l'utilisateur (les autres servent au diagnostic).
+SHOWN_WARNINGS = ("low_resolution", "audiveris_skipped", "large_skew")
+
+
+def reading_warnings(model: ScoreModel) -> list[dict]:
+    """Ce que la lecture a remarqué, par type : {"code", "pages"} ; pour une basse
+    résolution, aussi la plus basse résolution d'origine (« dpi », arrondie)."""
+    found: dict[str, dict] = {}
+    for page in model.pages:
+        for code in page.warnings:
+            if code not in SHOWN_WARNINGS:
+                continue
+            item = found.setdefault(code, {"code": code, "pages": []})
+            item["pages"].append(page.number)
+            if code == "low_resolution" and page.source_dpi:
+                dpi = round(page.source_dpi)
+                item["dpi"] = min(item.get("dpi", dpi), dpi)
+    return [found[code] for code in SHOWN_WARNINGS if code in found]
 
 
 # --- Conducteurs --------------------------------------------------------------------------

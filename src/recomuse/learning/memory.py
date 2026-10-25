@@ -23,7 +23,7 @@ import cv2
 import numpy as np
 
 from recomuse.importer.loading import read_gray
-from recomuse.learning.corrections import CorrectionService, NewSymbol
+from recomuse.learning.corrections import CorrectionError, CorrectionService, NewSymbol
 from recomuse.learning.journal import CorrectionJournal
 from recomuse.model.score import ScoreModel
 from recomuse.model.store import load_model
@@ -127,7 +127,15 @@ def replay(conn: sqlite3.Connection, service: CorrectionService, old_id: int,
 def replay_work(conn: sqlite3.Connection, service: CorrectionService, corrections: list[dict],
                 answers: list[dict], new_id: int, reason: str) -> dict:
     """Rejoue des corrections (et reprend des réponses), venant d'une partition de la base
-    ou d'un pack d'apprentissage. Renvoie {"applied", "skipped", "answers"}."""
+    ou d'un pack d'apprentissage. Renvoie {"applied", "skipped", "answers"}.
+
+    Les mêmes pages ne donnent pas toujours la même lecture (RECOmuse ou Audiveris ont pu
+    changer entre-temps) : une correction n'est rejouée que si le symbole lit encore ce
+    qu'il lisait alors (sinon elle tomberait sur un autre contenu), et un groupe qui ne
+    s'applique plus est compté comme non repris, sans faire échouer l'ouverture. Une
+    réponse n'est reprise que si toutes ses corrections l'ont été ; si la lecture a changé
+    (une correction au moins non reprise), les réponses « c'est juste », sans correction,
+    ne le sont pas non plus : la question sera reposée sur la nouvelle lecture."""
     groups: list[list[dict]] = []
     for correction in corrections:
         if correction["group_id"] and groups \
@@ -151,8 +159,8 @@ def replay_work(conn: sqlite3.Connection, service: CorrectionService, correction
                 additions.append(NewSymbol(where["measure_id"], c["symbol_kind"],
                                            dict(c["new_value"]), after=after))
                 order[2].append(c["id"])
-            elif not _symbol_exists(model, c["symbol_id"]):
-                skipped += 1
+            elif _value(model, c["symbol_id"]) != c["old_value"]:
+                skipped += 1                              # absent, ou lu autrement
             elif c["new_value"] is None:                  # suppression
                 removals.append(c["symbol_id"])
                 order[1].append(c["id"])
@@ -161,13 +169,21 @@ def replay_work(conn: sqlite3.Connection, service: CorrectionService, correction
                 order[0].append(c["id"])
         if not (changes or removals or additions):
             continue
-        ids = service.apply_group(new_id, changes, source="rule", reason=reason,
-                                  additions=additions, removals=removals)
+        try:
+            ids = service.apply_group(new_id, changes, source="rule", reason=reason,
+                                      additions=additions, removals=removals)
+        except CorrectionError:
+            # Ne s'applique plus (un chiffrage ajouté alors est maintenant lu...).
+            skipped += len(changes) + len(removals) + len(additions)
+            continue
         mapping.update(zip(order[0] + order[1] + order[2], ids, strict=True))
         applied += len(ids)
 
+    kept = [a for a in answers
+            if all(i in mapping for i in a["correction_ids"])
+            and (a["correction_ids"] or not skipped)]
     with conn:
-        for answer in answers:
+        for answer in kept:
             ids = [mapping[i] for i in answer["correction_ids"] if i in mapping]
             conn.execute(
                 "INSERT INTO question_answers (score_id, question_key, code, choice_id, value,"
@@ -176,7 +192,7 @@ def replay_work(conn: sqlite3.Connection, service: CorrectionService, correction
                 (new_id, answer["question_key"], answer["code"], answer["choice_id"],
                  answer["value"], json.dumps(ids), answer["signature"],
                  answer["choice_label"]))
-    return {"applied": applied, "skipped": skipped, "answers": len(answers)}
+    return {"applied": applied, "skipped": skipped, "answers": len(kept)}
 
 
 def same_pages(stored: list[str], wanted: list[str]) -> bool:
@@ -185,12 +201,12 @@ def same_pages(stored: list[str], wanted: list[str]) -> bool:
         distance(a, b) <= MAX_DISTANCE for a, b in zip(stored, wanted, strict=True))
 
 
-def _symbol_exists(model: ScoreModel, symbol_id: str | None) -> bool:
+def _value(model: ScoreModel, symbol_id: str | None) -> dict | None:
+    """Valeur actuelle d'un symbole (None s'il n'existe pas)."""
     try:
-        model.find(symbol_id or "")
-        return True
+        return model.find(symbol_id or "")[2].value
     except KeyError:
-        return False
+        return None
 
 
 def _measure_exists(model: ScoreModel, measure_id: str | None) -> bool:

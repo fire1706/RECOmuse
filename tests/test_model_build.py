@@ -259,3 +259,31 @@ def test_build_model_vector_only(tmp_path):
     model = build_model(imported(tmp_path, [1]), None, vector)
     assert len(model.parts[0].measures) == 2
     assert all(s.source == "vector" for s in model.symbols())
+
+
+def test_each_part_gets_the_staff_with_its_own_number(tmp_path):
+    # PDF de parties séparées : Audiveris fait une partie par instrument (P1, P2...) mais
+    # chaque page n'en contient qu'une. Ici, la page n'a que la partie logique 2 : ses
+    # positions vont à P2, et non à P1 (la 1re de la liste).
+    second = MUSICXML.split('<part id="P1">')[1].split("</part>")[0]
+    empty = "".join(f'<measure number="{n}"><note><rest measure="yes"/><duration>8</duration>'
+                    f'<voice>1</voice></note></measure>' for n in (1, 2))
+    xml = (MUSICXML
+           .replace('<score-part id="P1"><part-name>Flute</part-name></score-part>',
+                    '<score-part id="P1"><part-name>Oboe</part-name></score-part>'
+                    '<score-part id="P2"><part-name>Flute</part-name></score-part>')
+           .replace(f'<part id="P1">{second}</part>',
+                    f'<part id="P1">{empty}</part><part id="P2">{second}</part>'))
+    recognition = make_recognition(tmp_path)
+    with zipfile.ZipFile(recognition.run.movement_paths[0], "w") as archive:
+        archive.writestr("META-INF/container.xml",
+                         '<container><rootfiles><rootfile full-path="livre.xml"/></rootfiles>'
+                         '</container>')
+        archive.writestr("livre.xml", xml)
+    with zipfile.ZipFile(recognition.run.omr_path, "w") as archive:
+        archive.writestr("book.xml", "<book/>")
+        archive.writestr("sheet#1/sheet#1.xml", SHEET.replace('<part id="1">', '<part id="2">'))
+    oboe, flute = from_audiveris.build_parts(recognition)
+    assert all(m.bbox is None for m in oboe)
+    assert all(m.bbox is not None for m in flute)
+    assert flute[0].events[0].bbox == (150.0, 100.0, 13.0, 10.0)

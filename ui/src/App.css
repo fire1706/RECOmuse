@@ -475,6 +475,26 @@ input:not([type]) {
   color: var(--text-muted);
 }
 
+/* Avertissements de lecture (image trop petite...) : bandeau orangé, bien visible. */
+.reading-warnings {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem 0.6rem 1.8rem;
+  border: 1px solid rgb(240 140 58 / 55%);
+  border-radius: 6px;
+  background: rgb(240 140 58 / 12%);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.reading-warnings li + li {
+  margin-top: 0.35rem;
+}
+
+.card-warning {
+  font-size: 0.8rem;
+  color: var(--selection);
+}
+
 /* --- Questions -------------------------------------------------------------------------- */
 
 .question-progress,

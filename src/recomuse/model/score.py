@@ -125,6 +125,10 @@ class PageInfo:
     height: int = 0
     source: str = "none"            # qui a lu cette page : « vector », « audiveris », ou
                                     # « none » (pas de musique : couverture, notice...)
+    source_dpi: float | None = None  # résolution d'origine (scan, image), si connue
+    # Ce que la lecture a remarqué sur cette page (« low_resolution », « large_skew »,
+    # « audiveris_skipped »...) : montré à l'utilisateur avec la partition.
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass

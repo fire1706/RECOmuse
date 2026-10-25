@@ -66,6 +66,10 @@ class OmrSheet:
     height: int
     # systems[id du système] = mesures de chaque partie : systems["1"][0] = 1re partie
     systems: dict[str, list[list[OmrMeasure]]] = field(default_factory=dict)
+    # part_ids[id du système] = numéro de partie logique de chacune de ses parties (le
+    # « P234 » du MusicXML est la partie logique 234). Un système ne contient pas toujours
+    # toutes les parties : dans un PDF de parties séparées, chaque page n'en a qu'une.
+    part_ids: dict[str, list[int | None]] = field(default_factory=dict)
 
 
 def _symbol(element: ET.Element) -> OmrSymbol | None:
@@ -129,7 +133,9 @@ def read_sheet(omr_path: Path, sheet: int) -> OmrSheet | None:
                                         if h in symbols and symbols[h].kind == "head"])
                       for symbol in symbols.values() if symbol.kind in ("head-chord", "rest-chord")]
         parts = []
+        ids: list[int | None] = []
         for part in system.findall("part"):
+            ids.append(int(part.get("id")) if (part.get("id") or "").isdigit() else None)
             staff_ids = {int(s.get("id")) for s in part.findall("staff") if s.get("id")}
             line_ys = [float(point.get("y")) for staff in part.findall("staff")
                        for point in staff.iter("point") if point.get("y")]
@@ -159,4 +165,5 @@ def read_sheet(omr_path: Path, sheet: int) -> OmrSheet | None:
                 measures.append(measure)
             parts.append(measures)
         result.systems[system.get("id")] = parts
+        result.part_ids[system.get("id")] = ids
     return result

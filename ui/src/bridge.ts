@@ -14,6 +14,14 @@ export interface AppInfo {
 }
 
 /** Une partition lue (une partie d'un fichier). */
+/** Ce que la lecture a remarqué (image trop petite, page non lue...), par type. */
+export interface ReadingWarning {
+  code: 'low_resolution' | 'audiveris_skipped' | 'large_skew'
+  pages: number[]
+  /** Basse résolution : la plus basse résolution d'origine, en dpi. */
+  dpi?: number
+}
+
 export interface ScoreSummary {
   score_id: number
   title: string | null
@@ -25,6 +33,8 @@ export interface ScoreSummary {
   instruments: (string | null)[]
   /** Partition tirée d'autres : partie extraite d'un conducteur, conducteur assemblé. */
   derived: 'extracted' | 'assembled' | null
+  /** Avertissements de lecture (absents des partitions enregistrées avant). */
+  warnings?: ReadingWarning[]
   /** Partie déjà lue et corrigée : corrections et réponses reprises (à l'ouverture). */
   memory?: {
     from?: number

@@ -69,10 +69,15 @@ def build_model(score: ImportedScore, recognition: RecognitionResult | None = No
             return "vector"
         return "audiveris" if number in by_audiveris else "none"
 
+    # Pages qu'Audiveris a fait planter, laissées de côté (recognition/pipeline.py).
+    skipped = set(recognition.skipped_pages) if recognition is not None else set()
     model.pages = [
         PageInfo(number=p.page_number,
                  image_path=str(p.image_path) if p.image_path else None,
-                 width=p.width, height=p.height, source=source(p.page_number))
+                 width=p.width, height=p.height, source=source(p.page_number),
+                 source_dpi=p.source_dpi,
+                 warnings=list(p.warnings) + (["audiveris_skipped"]
+                                              if p.page_number in skipped else []))
         for p in score.pages if p.image_path is not None
     ]
     return model

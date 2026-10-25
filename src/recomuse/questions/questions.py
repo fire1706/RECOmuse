@@ -40,6 +40,7 @@ CODE_ORDER = [
     "time_signature_missed",
     "part_time_signature_differs",
     "multirest_missed",
+    "measure_empty",
     "measure_number_mismatch",
     "part_measures_missing",
     "part_measures_extra",
@@ -70,13 +71,16 @@ class Choice:
     input: str | None = None
     measure_id: str | None = None
     multirest_id: str | None = None
+    # Mesure vide : le silence à y mettre avant la pause multiple tapée.
+    fill_rest: NewSymbol | None = None
 
     def changes(self, value: int | None = None) -> tuple[list[Fix], list[NewSymbol]]:
         """Corrections à appliquer si l'utilisateur choisit cette réponse."""
         if self.input == "count":
             if not isinstance(value, int) or value < 1:
                 raise ValueError("Le nombre de mesures doit être un entier positif.")
-            return _multirest_changes(self.measure_id, self.multirest_id, value)
+            fixes, additions = _multirest_changes(self.measure_id, self.multirest_id, value)
+            return fixes, ([self.fill_rest] if self.fill_rest else []) + additions
         return list(self.fixes), list(self.additions)
 
     def to_dict(self) -> dict:
@@ -340,6 +344,33 @@ def _multirest(model: ScoreModel, issue: Issue) -> Question | None:
     return question
 
 
+def _empty_measure(model: ScoreModel, issue: Issue) -> Question | None:
+    """Mesure vide : un silence d'une mesure, une pause de plusieurs mesures, la mesure
+    précédente répétée (signe « % », courant dans les parties de fanfare), ou des notes
+    que la lecture a manquées (l'utilisateur les ajoute alors dans l'éditeur de mesure,
+    qui s'ouvre sur cette mesure)."""
+    try:
+        part, measure = model.find_measure(issue.details["measure_id"])
+    except KeyError:
+        return None
+    rest = NewSymbol(measure.id, "rest", {"duration": measure.expected_duration or "4",
+                                          "dots": 0, "voice": 1, "full_measure": True})
+    choices = [Choice("accept", "empty_rest", additions=[rest]),
+               Choice("count", "rest_other_count", input="count", measure_id=measure.id,
+                      fill_rest=rest)]
+    index = part.measures.index(measure)
+    previous = part.measures[index - 1] if index > 0 else None
+    if previous is not None and any(s.kind == "note" for s in previous.events):
+        # Copies des notes et silences de la mesure d'avant ; chaque ajout se place au
+        # début de la mesure : on les ajoute du dernier au premier.
+        copies = [NewSymbol(measure.id, s.kind, dict(s.value))
+                  for s in reversed(previous.events)]
+        choices.append(Choice("repeat", "empty_repeat", additions=copies))
+    choices.append(Choice("keep", "empty_has_notes"))
+    return _question(model, issue, [], params={}, choices=choices,
+                     key=f"measure_empty:{issue.part_id}:{measure.id}", measure=measure)
+
+
 # Doutes qui ne deviennent une question que s'ils proposent une pause à corriger.
 NEEDS_PROPOSAL = ("measure_number_mismatch", "part_measures_missing", "part_measures_extra")
 
@@ -355,6 +386,7 @@ BUILDERS = {
     "part_measures_missing": _multirest,
     "part_measures_extra": _multirest,
     "part_time_signature_differs": _time_signature,
+    "measure_empty": _empty_measure,
 }
 
 

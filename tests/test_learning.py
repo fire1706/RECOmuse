@@ -10,6 +10,7 @@ from recomuse.api import Api
 from recomuse.learning import memory, rules
 from recomuse.learning.corrections import CorrectionService, NewSymbol
 from recomuse.learning.journal import CorrectionJournal
+from recomuse.model.score import Symbol
 from recomuse.model.store import load_model, save_model
 from recomuse.questions.session import QuestionSession
 from recomuse.recognition import tools
@@ -220,3 +221,33 @@ def test_opening_the_same_file_again_reuses_the_corrections(conn, tmp_path, monk
     stored = conn.execute("SELECT COUNT(*) FROM page_fingerprints").fetchone()[0]
     assert stored == 2
     json.dumps(second)                                       # tout passe vers l'interface
+
+
+def test_replay_skips_a_correction_when_the_reading_changed(conn):
+    # Mêmes pages, nouvelle lecture (RECOmuse a changé) : la note m1.n0 existe encore
+    # mais ne lit plus la même chose ; corriger son octave tomberait sur autre chose.
+    service = CorrectionService(conn)
+    old = new_score(conn)
+    service.apply(old, "m1.n0", {"octave": 6}, source="manual")
+    new = new_score(conn)
+    model = load_model(conn, new)
+    model.find("m1.n0")[2].value["step"] = "G"
+    save_model(conn, new, model)
+    assert memory.replay(conn, service, old, new) == {"from": old, "applied": 0,
+                                                      "skipped": 1, "answers": 0}
+    assert load_model(conn, new).find("m1.n0")[2].value["octave"] == 5
+
+
+def test_replay_never_makes_the_opening_fail(conn, session):
+    # Le chiffrage ajouté alors est maintenant lu : l'ajout ne s'applique plus. Avant, toute
+    # l'ouverture échouait ; maintenant, il est compté comme non repris, et la réponse
+    # qui l'avait ajouté n'est pas reprise.
+    old = new_score(conn)
+    session.answer(old, KEY, "accept")
+    new = new_score(conn)
+    model = load_model(conn, new)
+    model.find_measure("m2")[1].attributes.append(
+        Symbol(id="m2.t", kind="time", value={"beats": 3, "beat_type": 4}, page=1))
+    save_model(conn, new, model)
+    result = memory.replay(conn, CorrectionService(conn), old, new)
+    assert result == {"from": old, "applied": 0, "skipped": 1, "answers": 0}

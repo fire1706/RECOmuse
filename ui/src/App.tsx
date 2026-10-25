@@ -32,6 +32,7 @@ import MeasureEditor from './MeasureEditor'
 import PacksDialog from './PacksDialog'
 import QuestionPanel from './QuestionPanel'
 import ReadingProgress from './ReadingProgress'
+import ReadingWarnings from './ReadingWarnings'
 import RulesDialog from './RulesDialog'
 import ScanView from './ScanView'
 import ScoreView from './ScoreView'
@@ -343,6 +344,9 @@ export default function App({ connect = waitForBridge }: AppProps) {
                     <span className="card-detail">
                       {t('home.measures', { count: score.measure_count })}
                     </span>
+                    {(score.warnings ?? []).length > 0 && (
+                      <span className="card-warning">{t('warnings.short')}</span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -412,6 +416,7 @@ export default function App({ connect = waitForBridge }: AppProps) {
             <Dock id="questions" title={t('panels.questions')} open={docks.questions}
               onToggle={() => toggleDock('questions')}>
               {notices}
+              {reading === null && current && <ReadingWarnings warnings={current.warnings ?? []} />}
               {reading === null && engine.kind === 'connected' && scoreId !== null ? (
                 <QuestionPanel key={`${scoreId}-${editVersion}`} api={engine.api} scoreId={scoreId}
                   onAnswered={refreshInfo} onFocus={focusMeasure} />

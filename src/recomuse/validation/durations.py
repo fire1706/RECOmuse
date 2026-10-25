@@ -9,7 +9,10 @@ Trois cas :
   c'est un passage dans un autre chiffrage (un 2/4 au milieu d'un 4/4) : la correction
   proposée remet aussi l'ancien chiffrage après le passage, sinon les mesures suivantes,
   justes, deviendraient toutes fausses (erreurs en cascade) ; deux mesures suffisent alors ;
-- une partie sans aucun chiffrage : on propose celui de la durée la plus fréquente.
+- une partie sans aucun chiffrage : on propose celui de la durée la plus fréquente ;
+- une mesure vide (ni note, ni silence, ni pause multiple) : une mesure écrite n'est jamais
+  vide, la lecture a manqué son contenu (vu sur une partie de tuba : des rondes graves,
+  avec beaucoup de lignes supplémentaires, ignorées par Audiveris).
 Une première mesure plus courte est une levée : elle est normale.
 """
 
@@ -58,7 +61,20 @@ def check_durations(model: ScoreModel) -> list[Issue]:
     issues: list[Issue] = []
     for part in model.parts:
         issues += _check_part(part)
+        issues += _empty_measures(part)
     return issues
+
+
+def _empty_measures(part: Part) -> list[Issue]:
+    """Mesures sans rien dedans (ni note, ni silence, ni pause multiple). Pas celles des
+    percussions : leur notation n'est pas encore lue."""
+    skip = _percussion_measures(part)
+    return [Issue(code="measure_empty", part_id=part.id, measure_numbers=[m.number],
+                  severity="error", confidence=0.9,
+                  details={"measure_id": m.id, "expected": m.expected_duration})
+            for m in part.measures
+            if m.id not in skip and not m.events
+            and not any(s.kind == "multirest" for s in m.attributes)]
 
 
 def _check_part(part: Part) -> list[Issue]:

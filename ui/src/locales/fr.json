@@ -86,7 +86,8 @@
       "clef_sign_suspicious_range": "Cette clé a été lue comme une {{read}}, mais alors les {{notes}} notes qu'elle gouverne sortent de l'étendue de l'instrument. Avec une {{proposed}}, elles y seraient. Quelle clé voyez-vous ?",
       "clef_sign_suspicious_change": "Cette clé a été lue comme une {{read}}, alors que la partie était en {{proposed}} jusqu'ici. Quelle clé voyez-vous ? (La réponse renomme les {{notes}} notes qui la suivent.)",
       "time_signature_missed_section": "Les mesures {{first}} à {{last}} ne correspondent pas au chiffrage, mais la suivante, si. Ce passage est-il à {{time}}, avant de revenir à {{back}} ?",
-      "clef_sign_suspicious_missing": "Aucune clé n'a été lue au début de la partie : ces mesures s'affichent en clé de sol. La suite de la partie est en {{proposed}}. Est-ce aussi la clé du début ?"
+      "clef_sign_suspicious_missing": "Aucune clé n'a été lue au début de la partie : ces mesures s'affichent en clé de sol. La suite de la partie est en {{proposed}}. Est-ce aussi la clé du début ?",
+      "measure_empty": "Cette mesure est vide : la lecture n'y a rien trouvé. Que contient-elle ?"
     },
     "choices": {
       "clef_plain": "Une clé normale, sans 8",
@@ -109,7 +110,10 @@
       "clef_alto": "Une clé d'ut 3e ligne",
       "clef_tenor": "Une clé d'ut 4e ligne",
       "clef_as_read": "La clé lue est juste",
-      "time_section": "Oui, {{time}}, puis de nouveau {{back}}"
+      "time_section": "Oui, {{time}}, puis de nouveau {{back}}",
+      "empty_rest": "Un silence d'une mesure",
+      "empty_has_notes": "Des notes : je les ajoute à la main",
+      "empty_repeat": "La mesure d'avant, répétée (signe %)"
     },
     "compared_one": "Comparée à {{count}} autre partie du morceau.",
     "compared_other": "Comparée aux {{count}} autres parties du morceau.",
@@ -492,5 +496,15 @@
     "empty": "Aucune partition lue pour l'instant : ouvrez un PDF ou une image pour commencer.",
     "measures_one": "{{count}} mesure",
     "measures_other": "{{count}} mesures"
+  },
+  "warnings": {
+    "label": "Remarques sur la lecture",
+    "short": "⚠ Lecture à vérifier",
+    "low_resolution_one": "Image de basse résolution (environ {{dpi}} dpi, page {{pages}}) : la lecture risque d'être mauvaise. Pour un meilleur résultat, scannez la partition à 300 dpi.",
+    "low_resolution_other": "Images de basse résolution (environ {{dpi}} dpi, pages {{pages}}) : la lecture risque d'être mauvaise. Pour un meilleur résultat, scannez la partition à 300 dpi.",
+    "audiveris_skipped_one": "Audiveris n'a pas pu lire la page {{pages}} : elle a été laissée de côté, et ses mesures manquent.",
+    "audiveris_skipped_other": "Audiveris n'a pas pu lire les pages {{pages}} : elles ont été laissées de côté, et leurs mesures manquent.",
+    "large_skew_one": "La page {{pages}} est très penchée : redressée, elle serait mieux lue (posez-la droite sur le scanner).",
+    "large_skew_other": "Les pages {{pages}} sont très penchées : redressées, elles seraient mieux lues (posez-les droites sur le scanner)."
   }
 }

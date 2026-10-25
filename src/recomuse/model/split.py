@@ -112,6 +112,58 @@ def _with_initial_state(measures: list[Measure], kept: list[Measure]) -> list[Me
     return kept
 
 
+# Identifiant d'une mesure lue par Audiveris : a<mouvement>.<partie>.<rang>.
+_AUDIVERIS_MEASURE = re.compile(r"a(\d+)\.\d+\.(\d+)")
+
+
+def _single_staff(model: ScoreModel, start: int, end: int | None
+                  ) -> tuple[Part, list[Measure]] | None:
+    """Partie à une portée dont Audiveris a réparti les systèmes entre plusieurs parties
+    (vu sur Amina : le piccolo est la partie 1 sur certains systèmes, la partie 2 sur
+    d'autres). Dans un mouvement d'Audiveris, les parties ont les mêmes mesures dans le
+    même ordre (vides là où elles ne sont pas imprimées) ; l'identifiant d'une mesure le
+    dit : « a3.1.12 » = mouvement 3, partie 1, 12e mesure. Si sur ces pages une seule
+    partie au plus est imprimée à chaque mesure, on les réunit en une portée, avec à
+    chaque mesure celle qui est imprimée. Renvoie (portée réunie, ses mesures sur ces
+    pages), ou None (une seule partie, mesures qui ne viennent pas d'Audiveris, ou
+    plusieurs portées imprimées ensemble : conducteur, piano...)."""
+    if len(model.parts) < 2:
+        return None
+    columns: dict[tuple[int, int], list[Measure]] = {}
+    for part in model.parts:
+        for measure in part.measures:
+            match = _AUDIVERIS_MEASURE.fullmatch(measure.id)
+            if match is None:
+                return None
+            columns.setdefault((int(match[1]), int(match[2])), []).append(measure)
+    whole, kept = [], []
+    for _, column in sorted(columns.items()):
+        placed = [m for m in column if m.bbox is not None]
+        here = [m for m in placed if _within(m.page, start, end)]
+        if len(here) > 1:
+            return None
+        whole.append(placed[0] if len(placed) == 1 else column[0])
+        if here:
+            kept.append(here[0])
+    if not kept:
+        return None
+    return Part(id=model.parts[0].id, name=model.parts[0].name, measures=whole), kept
+
+
+def _printed_staves(staves: list[tuple[Part, list[Measure]]]) -> list[tuple[Part, list[Measure]]]:
+    """Portées (et leurs mesures) vraiment imprimées sur une tranche de pages.
+
+    Audiveris ne reconnaît pas toujours le même instrument d'une page à l'autre : sur un
+    PDF de 89 pages de parties séparées, il en a fait 234 parties, chacune avec TOUTES les
+    mesures du livre, vides là où elle n'est pas imprimée. On ne garde que les portées dont
+    au moins une mesure est placée sur la page ; si aucune ne l'est (lecture sans
+    positions), toutes celles qui ont des mesures."""
+    with_measures = [(part, kept) for part, kept in staves if kept]
+    printed = [(part, kept) for part, kept in with_measures
+               if any(m.bbox is not None for m in kept)]
+    return printed or with_measures
+
+
 def split_parts(model: ScoreModel, page_headers: dict[int, HeaderInfo]) -> list[ScoreModel]:
     """Un modèle par partie trouvée dans le PDF (le modèle lui-même s'il n'y en a qu'une)."""
     starts = part_starts(model, page_headers)
@@ -122,16 +174,20 @@ def split_parts(model: ScoreModel, page_headers: dict[int, HeaderInfo]) -> list[
         end = starts[index + 1] if index + 1 < len(starts) else None
         header = page_headers.get(start) or HeaderInfo()
         instrument = header.instrument or (model.instrument if index == 0 else None)
+        merged = _single_staff(model, start, end)
+        if merged is not None:
+            staves = [merged]
+        else:
+            staves = _printed_staves(
+                [(part, [m for m in part.measures if _within(m.page, start, end)])
+                 for part in model.parts])
         part_model = ScoreModel(
             title=model.title or header.title, composers=list(model.composers),
             instrument=instrument, tempo=header.tempo or (model.tempo if index == 0 else None),
             source_path=model.source_path,
             parts=[Part(id=f"P{rank + 1}", name=instrument,
                         measures=_with_initial_state(part.measures, kept))
-                   for rank, (part, kept) in enumerate(
-                       (part, [m for m in part.measures if _within(m.page, start, end)])
-                       for part in model.parts)
-                   if kept],
+                   for rank, (part, kept) in enumerate(staves)],
             pages=[p for p in model.pages if _within(p.number, start, end)],
         )
         part_model.renumber()

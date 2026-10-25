@@ -86,7 +86,8 @@
       "clef_sign_suspicious_range": "This clef was read as a {{read}}, but then the {{notes}} notes it governs fall outside the instrument's range. With a {{proposed}}, they would fit. Which clef do you see?",
       "clef_sign_suspicious_change": "This clef was read as a {{read}}, while the part was in {{proposed}} until here. Which clef do you see? (The answer renames the {{notes}} notes that follow it.)",
       "time_signature_missed_section": "Bars {{first}} to {{last}} do not match the time signature, but the next one does. Is this passage in {{time}}, before going back to {{back}}?",
-      "clef_sign_suspicious_missing": "No clef was read at the start of the part: these bars are shown in treble clef. The rest of the part is in {{proposed}}. Is it also the clef at the start?"
+      "clef_sign_suspicious_missing": "No clef was read at the start of the part: these bars are shown in treble clef. The rest of the part is in {{proposed}}. Is it also the clef at the start?",
+      "measure_empty": "This bar is empty: the reading found nothing in it. What does it contain?"
     },
     "choices": {
       "clef_plain": "A normal clef, without an 8",
@@ -109,7 +110,10 @@
       "clef_alto": "An alto clef",
       "clef_tenor": "A tenor clef",
       "clef_as_read": "The clef read is right",
-      "time_section": "Yes, {{time}}, then {{back}} again"
+      "time_section": "Yes, {{time}}, then {{back}} again",
+      "empty_rest": "A one-bar rest",
+      "empty_has_notes": "Notes: I will add them by hand",
+      "empty_repeat": "The previous bar, repeated (% sign)"
     },
     "compared_one": "Compared with {{count}} other part of the piece.",
     "compared_other": "Compared with the {{count}} other parts of the piece.",
@@ -492,5 +496,15 @@
     "empty": "No score read yet: open a PDF or an image to start.",
     "measures_one": "{{count}} bar",
     "measures_other": "{{count}} bars"
+  },
+  "warnings": {
+    "label": "Reading notes",
+    "short": "⚠ Reading to check",
+    "low_resolution_one": "Low-resolution image (about {{dpi}} dpi, page {{pages}}): the reading may be poor. For a better result, scan the score at 300 dpi.",
+    "low_resolution_other": "Low-resolution images (about {{dpi}} dpi, pages {{pages}}): the reading may be poor. For a better result, scan the score at 300 dpi.",
+    "audiveris_skipped_one": "Audiveris could not read page {{pages}}: it was left out, and its bars are missing.",
+    "audiveris_skipped_other": "Audiveris could not read pages {{pages}}: they were left out, and their bars are missing.",
+    "large_skew_one": "Page {{pages}} is badly tilted: straightened, it would be read better (lay it straight on the scanner).",
+    "large_skew_other": "Pages {{pages}} are badly tilted: straightened, they would be read better (lay them straight on the scanner)."
   }
 }

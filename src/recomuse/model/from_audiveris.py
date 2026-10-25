@@ -93,16 +93,40 @@ def build_parts(result: RecognitionResult) -> list[list[Measure]]:
             order = sorted(omr.systems, key=int) if omr else []
             for system_id in movement.sheet_systems[sheet_number]:
                 systems = omr.systems.get(str(system_id), []) if omr else []
+                ids = omr.part_ids.get(str(system_id), []) if omr else []
                 rank = order.index(str(system_id)) if str(system_id) in order else None
-                located.append((sheet_number, omr, systems, rank))
+                located.append((sheet_number, omr, _PartColumns(systems, ids), rank))
         for part_index, part in enumerate(root.findall("part")):
             while len(parts) <= part_index:
                 parts.append([])
-            omr_measures = _align(part, part_index, located)
+            omr_measures = _align(part, _part_key(part, part_index), located)
             default_sheet = located[0][0] if located else 1
             parts[part_index] += _read_part(part, movement_index, part_index, omr_measures,
                                             default_sheet, book, page_width)
     return parts
+
+
+class _PartColumns:
+    """Les mesures du .omr d'un système, partie par partie : `of(clé)` donne celles d'une
+    partie du MusicXML. Par son numéro de partie logique quand le .omr le donne (un système
+    peut ne contenir qu'une partie sur 234 : PDF de toutes les parties à la suite), sinon
+    par son rang (anciens fichiers, tests)."""
+
+    def __init__(self, systems: list[list], ids: list[int | None]) -> None:
+        self.systems = systems
+        self.ids = ids
+
+    def of(self, key: tuple[int, int | None]) -> list:
+        index, logical = key
+        if logical is not None and any(i is not None for i in self.ids):
+            return self.systems[self.ids.index(logical)] if logical in self.ids else []
+        return self.systems[index] if index < len(self.systems) else []
+
+
+def _part_key(part: ET.Element, part_index: int) -> tuple[int, int | None]:
+    """Rang de la partie, et son numéro de partie logique (« P234 » → 234) s'il y en a un."""
+    ident = part.get("id") or ""
+    return part_index, int(ident[1:]) if ident[:1] == "P" and ident[1:].isdigit() else None
 
 
 def _system_breaks(part: ET.Element) -> list[list[ET.Element]]:
@@ -117,7 +141,7 @@ def _system_breaks(part: ET.Element) -> list[list[ET.Element]]:
     return systems
 
 
-def _align(part: ET.Element, part_index: int, located: list) -> list:
+def _align(part: ET.Element, key: tuple[int, int | None], located: list) -> list:
     """Mesure du .omr (avec sa feuille) qui correspond à chaque mesure du MusicXML.
 
     Système par système : le k-ième système du MusicXML va avec le k-ième système du .omr.
@@ -130,14 +154,14 @@ def _align(part: ET.Element, part_index: int, located: list) -> list:
     result = []
     if len(xml_systems) != len(located):
         # Découpages incompatibles : association une à une, dans l'ordre.
-        flat = [(sheet, omr, m, rank) for sheet, omr, systems, rank in located
-                for m in (systems[part_index] if part_index < len(systems) else [])]
+        flat = [(sheet, omr, m, rank) for sheet, omr, columns, rank in located
+                for m in columns.of(key)]
         for index, _ in enumerate(part.findall("measure")):
             result.append(flat[index] if index < len(flat) else (None, None, None, None))
         return result
 
-    for xml_measures, (sheet, omr, systems, rank) in zip(xml_systems, located, strict=True):
-        columns = systems[part_index] if part_index < len(systems) else []
+    for xml_measures, (sheet, omr, by_part, rank) in zip(xml_systems, located, strict=True):
+        columns = by_part.of(key)
         widths = [_float(m.get("width")) or 1.0 for m in xml_measures]
         total = sum(widths)
         if not columns:
