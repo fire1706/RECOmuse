@@ -368,9 +368,9 @@ class Api:
         except (QuestionError, CorrectionError):
             log.exception("Question impossible")
             return {"error": "question_failed"}
-        except editing.EditError:
+        except editing.EditError as error:
             log.exception("Modification impossible")
-            return {"error": "edit_failed"}
+            return {"error": error.code}
         except instruments.TranspositionError:
             log.exception("Transposition impossible")
             return {"error": "transposition_failed"}

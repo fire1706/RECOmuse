@@ -20,6 +20,8 @@ from typing import Any
 
 from recomuse.learning.corrections import CorrectionError, CorrectionService, NewSymbol
 from recomuse.learning.journal import CorrectionJournal
+from recomuse.model import marks
+from recomuse.model.measures import MeasureEditError, merge_with_next, split_after
 from recomuse.model.score import Measure, Part, ScoreModel, Symbol, fraction_text
 from recomuse.model.store import load_model
 from recomuse.vector.pitch import (
@@ -36,7 +38,12 @@ WRITTEN_DURATIONS = ("4", "2", "1", "1/2", "1/4", "1/8")
 
 
 class EditError(ValueError):
-    """Geste impossible (symbole inconnu, valeur hors des choix proposés...)."""
+    """Geste impossible (symbole inconnu, valeur hors des choix proposés...). `code` est
+    traduit par l'interface (« merge_conflict »...) ; par défaut « edit_failed »."""
+
+    def __init__(self, message: str, code: str = "edit_failed") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 # --- Lecture d'une mesure -----------------------------------------------------------------
@@ -79,6 +86,17 @@ def apply_edit(conn: sqlite3.Connection, service: CorrectionService, score_id: i
     garder choisi (le nouveau, après un ajout), "corrections": numéros dans le journal}."""
     model = _load(conn, score_id)
     op = edit.get("op")
+    if op in STRUCTURE:
+        # Découpage en mesures : une seule correction, qui remplace des mesures entières.
+        try:
+            change = STRUCTURE[op](model, edit.get("measure_id") or edit.get("symbol_id") or "")
+            correction = service.restructure(score_id, change, source="manual",
+                                             reason=f"edit:{op}")
+        except MeasureEditError as error:
+            raise EditError(str(error), error.code) from None
+        except CorrectionError as error:
+            raise EditError(str(error)) from None
+        return {"measure_id": change.selected, "symbol_id": None, "corrections": [correction]}
     handler = OPERATIONS.get(op)
     if handler is None:
         raise EditError(f"Geste inconnu : {op}")
@@ -104,6 +122,8 @@ def undo_last_edit(conn: sqlite3.Connection, service: CorrectionService,
         return None
     service.revert_all([c.id for c in group])
     first = group[0]
+    if first.symbol_kind == "measures":
+        return first.symbol_id                # la première des mesures remises
     if first.location:
         return first.location.get("measure_id")
     try:
@@ -274,11 +294,80 @@ def _multirest(model: ScoreModel, edit: dict) -> Result:
     return _set_attribute(measure, "multirest", {"count": count})
 
 
+def _articulation(model: ScoreModel, edit: dict) -> Result:
+    """Ajoute ou retire une articulation (staccato, accent...) de la note choisie."""
+    symbol, measure = _symbol(model, edit)
+    name = edit.get("name")
+    if symbol.kind not in ("note", "rest") or name not in marks.ARTICULATIONS:
+        raise EditError(f"Articulation impossible : {name}")
+    current = list(symbol.value.get("articulations") or [])
+    current = [a for a in current if a != name] if name in current else current + [name]
+    return [(symbol.id, {"articulations": current})], [], [], measure.id, symbol.id
+
+
+def _dynamic(model: ScoreModel, edit: dict) -> Result:
+    """Nuance sous la note choisie (« » ou None : la retirer)."""
+    symbol, measure = _symbol(model, edit)
+    name = edit.get("value") or None
+    if symbol.kind not in ("note", "rest") or (name is not None and name not in marks.DYNAMICS):
+        raise EditError(f"Nuance impossible : {name}")
+    return [(symbol.id, {"dynamic": name})], [], [], measure.id, symbol.id
+
+
+def _slur(model: ScoreModel, edit: dict) -> Result:
+    """Liaison d'expression : commence (« start ») ou finit (« stop ») sur la note choisie
+    (un second clic l'enlève)."""
+    symbol, measure = _symbol(model, edit, "note")
+    field = {"start": "slur_start", "stop": "slur_stop"}.get(edit.get("end"))
+    if field is None:
+        raise EditError(f"Bout de liaison inconnu : {edit.get('end')}")
+    return ([(symbol.id, {field: not symbol.value.get(field)})], [], [], measure.id,
+            symbol.id)
+
+
+def _wedge(model: ScoreModel, edit: dict) -> Result:
+    """Soufflet : « crescendo » ou « diminuendo » commence sur la note choisie, « stop » y
+    finit, « none » enlève les deux."""
+    symbol, measure = _symbol(model, edit)
+    value = edit.get("value")
+    if value in marks.WEDGES:
+        change = {"wedge_start": value}
+    elif value == "stop":
+        change = {"wedge_stop": True}
+    elif value == "none":
+        change = {"wedge_start": None, "wedge_stop": False}
+    else:
+        raise EditError(f"Soufflet impossible : {value}")
+    return [(symbol.id, change)], [], [], measure.id, symbol.id
+
+
+def _tempo(model: ScoreModel, edit: dict) -> Result:
+    """Indication de tempo au début de la mesure : texte et/ou métronome (noires par
+    minute, ou par la figure « beat »). Les deux vides : l'indication est retirée."""
+    _, measure = _measure(model, edit.get("measure_id"))
+    text = (edit.get("text") or "").strip() or None
+    per_minute = edit.get("per_minute")
+    per_minute = int(per_minute) if per_minute not in (None, "") else None
+    if per_minute is not None and not 20 <= per_minute <= 400:
+        raise EditError(f"Métronome impossible : {per_minute}")
+    existing = next((s for s in measure.attributes if s.kind == "tempo"), None)
+    if text is None and per_minute is None:
+        return [], [], [existing.id] if existing else [], measure.id, None
+    value = {"text": text, "beat": str(edit.get("beat") or "1") if per_minute else None,
+             "per_minute": per_minute}
+    return _set_attribute(measure, "tempo", value)
+
+
+# Gestes qui changent le découpage en mesures (model/measures.py).
+STRUCTURE = {"merge_next": merge_with_next, "split_after": split_after}
+
 OPERATIONS = {
     "set": _set, "pitch": _pitch, "octave": _octave, "alter": _alter,
     "duration": _duration, "tie": _tie, "remove": _remove,
     "add_note": _add("note"), "add_rest": _add("rest"),
     "time": _time, "key": _key, "clef": _clef, "multirest": _multirest,
+    "articulation": _articulation, "dynamic": _dynamic, "slur": _slur, "wedge": _wedge,
+    "tempo": _tempo,
 }
 
 

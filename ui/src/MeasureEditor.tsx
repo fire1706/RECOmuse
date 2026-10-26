@@ -1,5 +1,7 @@
-// Éditeur de la mesure choisie : ses réglages (clé, armure, chiffrage, pause multiple),
-// ses notes et silences, et les gestes possibles sur le symbole choisi.
+// Éditeur de la mesure choisie : ses réglages (clé, armure, chiffrage, tempo, pause
+// multiple), ses notes et silences, et les gestes possibles sur le symbole choisi (dont
+// les signes d'expression : articulations, nuance, liaison, soufflet). La mesure peut être
+// réunie à la suivante (barre en trop) ou coupée après la note choisie (barre manquée).
 // Chaque geste est une correction « manuelle » enregistrée par le moteur ; « Annuler ma
 // dernière modification » la défait. Raccourcis quand une note est choisie : flèches
 // haut et bas (un cran), Suppr (supprimer).
@@ -29,6 +31,10 @@ interface MeasureEditorProps {
 export const DURATIONS: [string, string][] = [
   ['4', 'whole'], ['2', 'half'], ['1', 'quarter'], ['1/2', 'eighth'], ['1/4', 'sixteenth'], ['1/8', 'thirtySecond'],
 ]
+
+/** Signes d'expression proposés (noms du moteur : src/recomuse/model/marks.py). */
+export const ARTICULATIONS = ['staccato', 'accent', 'tenuto', 'marcato', 'fermata']
+export const DYNAMICS = ['ppp', 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff', 'sfz', 'fp']
 
 /** Clés proposées : signe, ligne, octave (« G:2:-1 » = clé de sol 8 en dessous). */
 export const CLEFS: [string, string][] = [
@@ -69,6 +75,8 @@ export default function MeasureEditor({
   const [beats, setBeats] = useState('')
   const [beatType, setBeatType] = useState('')
   const [count, setCount] = useState('')
+  const [tempoText, setTempoText] = useState('')
+  const [tempoSpeed, setTempoSpeed] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -86,6 +94,9 @@ export default function MeasureEditor({
         setBeats(b)
         setBeatType(bt)
         setCount(String(result.length))
+        const tempo = result.attributes.find((s) => s.kind === 'tempo')
+        setTempoText(String(tempo?.value.text ?? ''))
+        setTempoSpeed(tempo?.value.per_minute ? String(tempo.value.per_minute) : '')
       })
       .catch(() => !cancelled && setError('unexpected'))
     return () => {
@@ -222,6 +233,23 @@ export default function MeasureEditor({
         <form className="inline-form"
           onSubmit={(e) => {
             e.preventDefault()
+            edit({ op: 'tempo', measure_id: details.id, text: tempoText, per_minute: tempoSpeed })
+          }}>
+          <label>
+            {t('editor.tempo')}
+            <input value={tempoText} placeholder={t('editor.tempoText')} disabled={busy}
+              aria-label={t('editor.tempoText')} onChange={(e) => setTempoText(e.target.value)} />
+          </label>
+          <label>
+            ♩ =
+            <input type="number" min={20} max={400} value={tempoSpeed} disabled={busy}
+              aria-label={t('editor.tempoSpeed')} onChange={(e) => setTempoSpeed(e.target.value)} />
+          </label>
+          <button type="submit" disabled={busy}>{t('editor.apply')}</button>
+        </form>
+        <form className="inline-form"
+          onSubmit={(e) => {
+            e.preventDefault()
             edit({ op: 'multirest', measure_id: details.id, count: Number(count) })
           }}>
           <label>
@@ -242,6 +270,12 @@ export default function MeasureEditor({
           </button>
         ))}
         {details.events.length === 0 && <span className="empty">{t('editor.emptyMeasure')}</span>}
+        {details.next && (
+          <button type="button" className="link-button" disabled={busy}
+            onClick={() => edit({ op: 'merge_next', measure_id: details.id })}>
+            {t('editor.mergeNext')}
+          </button>
+        )}
         {!selected && details.length === 1 && (
           <>
             <button type="button" className="link-button" disabled={busy}
@@ -312,9 +346,53 @@ export default function MeasureEditor({
               onClick={() => edit({ op: 'add_rest', measure_id: details.id, after: selected.id })}>
               {t('editor.addRest')}
             </button>
+            <button type="button" disabled={busy || selected.id === details.events.at(-1)?.id}
+              onClick={() => edit({ op: 'split_after', symbol_id: selected.id })}>
+              {t('editor.splitAfter')}
+            </button>
             <button type="button" className="danger" disabled={busy}
               onClick={() => edit({ op: 'remove', symbol_id: selected.id })}>
               {t('editor.remove')}
+            </button>
+          </div>
+          <div className="editor-row">
+            <span className="editor-label">{t('editor.expression')}</span>
+            {ARTICULATIONS.filter((name) => selected.kind === 'note' || name === 'fermata').map((name) => (
+              <button key={name} type="button" disabled={busy}
+                aria-pressed={((selected.value.articulations as string[] | undefined) ?? []).includes(name)}
+                onClick={() => edit({ op: 'articulation', symbol_id: selected.id, name })}>
+                {t(`editor.articulations.${name}`)}
+              </button>
+            ))}
+            <label>
+              {t('editor.dynamic')}
+              <select value={String(selected.value.dynamic ?? '')} disabled={busy}
+                onChange={(e) => edit({ op: 'dynamic', symbol_id: selected.id, value: e.target.value })}>
+                <option value="">—</option>
+                {DYNAMICS.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="editor-row">
+            {selected.kind === 'note' && (['start', 'stop'] as const).map((end) => (
+              <button key={end} type="button" disabled={busy}
+                aria-pressed={Boolean(selected.value[end === 'start' ? 'slur_start' : 'slur_stop'])}
+                onClick={() => edit({ op: 'slur', symbol_id: selected.id, end })}>
+                {t(`editor.slur.${end}`)}
+              </button>
+            ))}
+            <label>
+              {t('editor.wedge')}
+              <select value={String(selected.value.wedge_start ?? 'none')} disabled={busy}
+                onChange={(e) => edit({ op: 'wedge', symbol_id: selected.id, value: e.target.value })}>
+                <option value="none">—</option>
+                <option value="crescendo">{t('editor.wedges.crescendo')}</option>
+                <option value="diminuendo">{t('editor.wedges.diminuendo')}</option>
+              </select>
+            </label>
+            <button type="button" disabled={busy} aria-pressed={Boolean(selected.value.wedge_stop)}
+              onClick={() => edit({ op: 'wedge', symbol_id: selected.id, value: selected.value.wedge_stop ? 'none' : 'stop' })}>
+              {t('editor.wedgeStop')}
             </button>
           </div>
         </div>

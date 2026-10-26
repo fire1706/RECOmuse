@@ -6,6 +6,7 @@ Les positions passent des points PDF aux pixels de l'image de la page à 300 dpi
 (celle préparée à l'import), dans laquelle les extraits d'image seront découpés.
 """
 
+from recomuse.model import marks
 from recomuse.model.score import Measure, Symbol, fraction_text
 from recomuse.vector import VectorScore
 from recomuse.vector.reader import Note, Rest
@@ -118,7 +119,28 @@ def _measure(ident: str, source, content: VectorStaff, page: int, system: int,
                 bbox=_box(event.x, y - 1.5 * il, 1.2 * il, 3 * il),
                 value={"duration": fraction_text(event.duration), "dots": event.dots,
                        "voice": event.voice, "full_measure": source.full_rest}))
+    _attach_marks(measure, getattr(source, "placed_marks", []))
     return measure
+
+
+def _attach_marks(measure: Measure, placed: list[tuple[float, str, str]]) -> None:
+    """Nuances et articulations lues dans le PDF : chacune va à la note (ou au silence,
+    pour une nuance) la plus proche horizontalement."""
+    leaders = [e for e in measure.events if not e.value.get("chord") and e.bbox is not None]
+    for x, kind, name in placed:
+        if kind == "dynamic" and name in marks.DYNAMICS:
+            targets = leaders
+        elif kind == "articulation" and name in marks.ARTICULATIONS:
+            targets = [e for e in leaders if e.kind == "note" or name == "fermata"]
+        else:
+            continue
+        if not targets:
+            continue
+        target = min(targets, key=lambda e: abs(e.bbox[0] - x))
+        if kind == "dynamic":
+            target.value["dynamic"] = name
+        elif name not in target.value.setdefault("articulations", []):
+            target.value["articulations"].append(name)
 
 
 def _musical_order(source) -> list:

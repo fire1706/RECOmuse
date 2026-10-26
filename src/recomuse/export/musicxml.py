@@ -5,8 +5,10 @@ Ce qui est écrit : titre, compositeurs, tempo écrit ; pour chaque partie son n
 MIDI et sa transposition (une partie de trompette en si bémol sonne un ton plus bas que
 écrit : MuseScore la jouera juste) ; clés, armures, chiffrages et leurs changements ;
 notes (hauteur, durée, points, nolets, liaisons, accords, petites notes, voix), silences,
-pauses multiples, lettres de répétition. Deux portées du même instrument (piano) forment
-une seule partie à deux portées.
+pauses multiples, lettres de répétition ; signes d'expression (model/marks.py) : liaisons
+d'expression, articulations, points d'orgue, nuances, soufflets, indications de tempo et
+métronome. Deux portées du même instrument (piano) forment une seule partie à deux
+portées.
 
 La partition est écrite telle qu'elle est dans le modèle : une mesure dont le compte est
 faux reste fausse (le musicien la verra dans MuseScore).
@@ -20,6 +22,7 @@ from xml.sax.saxutils import escape
 from recomuse import __version__
 from recomuse.export.notation import Accidentals, exported_parts, note_type, written
 from recomuse.instruments.table import Instrument, Variant
+from recomuse.model import marks
 from recomuse.model.score import Measure, Part, ScoreModel, Symbol
 
 ALTER_NAMES = {-2: "flat-flat", -1: "flat", 0: "natural", 1: "sharp", 2: "double-sharp"}
@@ -106,6 +109,7 @@ def _part(model: ScoreModel, staves: list[Part], divisions: int,
     number = 1
     fifths = [0] * len(staves)
     current_time: Fraction | None = None
+    extras = _Extras(staves)
     for index in range(len(staves[0].measures)):
         measures = [staff.measures[index] for staff in staves]
         first = measures[0]
@@ -118,9 +122,9 @@ def _part(model: ScoreModel, staves: list[Part], divisions: int,
 
         out.append(f'<measure number="{number}">')
         out += _attributes(measures, index == 0, divisions, fifths, variant, len(staves), count)
-        if index == 0 and with_tempo and model.tempo:
-            out.append('<direction placement="above"><direction-type>'
-                       f"<words>{escape(model.tempo)}</words></direction-type></direction>")
+        tempo = _attribute(first, "tempo")
+        if with_tempo and (tempo is not None or (index == 0 and model.tempo)):
+            out.append(_tempo(tempo.value if tempo is not None else {"text": model.tempo}))
         for mark in first.marks:
             out.append('<direction placement="above"><direction-type>'
                        f"<rehearsal>{escape(mark)}</rehearsal></direction-type></direction>")
@@ -130,7 +134,7 @@ def _part(model: ScoreModel, staves: list[Part], divisions: int,
             if multirest is not None or not measure.events:
                 out.append(_measure_rest(length, divisions, rank + 1))
             else:
-                out += _events(measure, divisions, fifths[rank], rank + 1)
+                out += _events(measure, divisions, fifths[rank], rank + 1, extras)
         out.append("</measure>")
         # Les autres mesures d'une pause multiple : des mesures de silence.
         for k in range(1, count):
@@ -232,7 +236,59 @@ def _measure_rest(length: Fraction, divisions: int, staff: int) -> str:
 # --- Notes et silences --------------------------------------------------------------------
 
 
-def _events(measure: Measure, divisions: int, fifths: int, staff: int) -> list[str]:
+class _Extras:
+    """Ce qui s'écrit autour des notes d'une partie : indications (nuance, début de
+    soufflet) avant une note, fin de soufflet après, liaisons d'expression dans la note."""
+
+    def __init__(self, staves: list[Part]) -> None:
+        self.before: dict[str, list[str]] = {}
+        self.after: dict[str, list[str]] = {}
+        self.slurs: dict[str, list[str]] = {}
+        for rank, staff in enumerate(staves, 1):
+            for measure in staff.measures:
+                for event in measure.events:
+                    dynamic = event.value.get("dynamic")
+                    if dynamic in marks.DYNAMICS:
+                        self.before.setdefault(event.id, []).append(_direction(
+                            f"<dynamics><{dynamic}/></dynamics>", "below", rank))
+            for k, span in enumerate(marks.spans(staff)):
+                number = k % 6 + 1     # numéros 1 à 6 : deux signes en cours diffèrent
+                if span.kind == "slur":
+                    self.slurs.setdefault(span.start.id, []).append(
+                        f'<slur type="start" number="{number}"/>')
+                    self.slurs.setdefault(span.end.id, []).append(
+                        f'<slur type="stop" number="{number}"/>')
+                else:
+                    self.before.setdefault(span.start.id, []).append(_direction(
+                        f'<wedge type="{span.form}" number="{number}"/>', "below", rank))
+                    self.after.setdefault(span.end.id, []).append(_direction(
+                        f'<wedge type="stop" number="{number}"/>', "below", rank))
+
+
+def _direction(content: str, placement: str, staff: int) -> str:
+    return (f'<direction placement="{placement}"><direction-type>{content}</direction-type>'
+            f"<staff>{staff}</staff></direction>")
+
+
+def _tempo(value: dict) -> str:
+    """Indication de tempo : texte (« Allegro »), métronome (« ♩ = 96 ») et vitesse de
+    lecture pour MuseScore (<sound tempo>, en noires par minute)."""
+    types = ""
+    if value.get("text"):
+        types += f"<direction-type><words>{escape(value['text'])}</words></direction-type>"
+    unit = marks.beat_unit(Fraction(value["beat"])) if value.get("beat") else None
+    if value.get("per_minute") and unit:
+        dot = "<beat-unit-dot/>" if unit[1] else ""
+        types += (f"<direction-type><metronome><beat-unit>{unit[0]}</beat-unit>{dot}"
+                  f"<per-minute>{value['per_minute']}</per-minute></metronome>"
+                  "</direction-type>")
+    speed = marks.quarters_per_minute(value)
+    sound = f'<sound tempo="{speed:g}"/>' if speed else ""
+    return f'<direction placement="above">{types}{sound}</direction>' if types else ""
+
+
+def _events(measure: Measure, divisions: int, fifths: int, staff: int,
+            extras: _Extras | None = None) -> list[str]:
     """Toutes les voix d'une portée, l'une après l'autre (retour au début de la mesure
     entre deux voix)."""
     voices: dict[int, list[Symbol]] = {}
@@ -251,7 +307,12 @@ def _events(measure: Measure, divisions: int, fifths: int, staff: int) -> list[s
         number = (staff - 1) * VOICES_PER_STAFF + rank + 1
         tuplets = _tuplet_marks(events)
         for event in events:
-            out.append(_note(event, divisions, number, staff, accidentals, tuplets.get(event.id)))
+            if extras is not None:
+                out += extras.before.get(event.id, [])
+            out.append(_note(event, divisions, number, staff, accidentals, tuplets.get(event.id),
+                             extras.slurs.get(event.id, []) if extras is not None else []))
+            if extras is not None:
+                out += extras.after.get(event.id, [])
     return out
 
 
@@ -283,7 +344,7 @@ def _tuplet_marks(events: list[Symbol]) -> dict[str, str]:
 
 
 def _note(event: Symbol, divisions: int, voice: int, staff: int, accidentals: Accidentals,
-          tuplet: str | None) -> str:
+          tuplet: str | None, slurs: list[str] | None = None) -> str:
     value = event.value
     parts: list[str] = []
     grace = bool(value.get("grace"))
@@ -330,6 +391,16 @@ def _note(event: Symbol, divisions: int, voice: int, staff: int, accidentals: Ac
         notations.append('<tied type="start"/>')
     if tuplet:
         notations.append(f'<tuplet type="{tuplet}"/>')
+    notations += slurs or []
+    found = value.get("articulations") or []
+    articulations = "".join(f"<{marks.ARTICULATIONS[a]}/>" for a in found
+                            if a in marks.ARTICULATIONS and a not in ("fermata", "stopped"))
+    if articulations:
+        notations.append(f"<articulations>{articulations}</articulations>")
+    if "fermata" in found:
+        notations.append("<fermata/>")
+    if "stopped" in found:
+        notations.append("<technical><stopped/></technical>")
     if notations:
         parts.append(f"<notations>{''.join(notations)}</notations>")
     return f"<note>{''.join(parts)}</note>"

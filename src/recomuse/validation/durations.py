@@ -10,6 +10,10 @@ Trois cas :
   proposée remet aussi l'ancien chiffrage après le passage, sinon les mesures suivantes,
   justes, deviendraient toutes fausses (erreurs en cascade) ; deux mesures suffisent alors ;
 - une partie sans aucun chiffrage : on propose celui de la durée la plus fréquente ;
+- deux mesures voisines trop courtes dont les durées font exactement une mesure : une barre
+  de mesure en trop (une hampe prise pour une barre) ; une mesure qui en vaut exactement
+  deux, avec un endroit où la première moitié est complète : une barre manquée. On propose
+  de réunir les deux mesures, ou de couper la mesure (model/measures.py) ;
 - une mesure vide (ni note, ni silence, ni pause multiple) : une mesure écrite n'est jamais
   vide, la lecture a manqué son contenu (vu sur une partie de tuba : des rondes graves,
   avec beaucoup de lignes supplémentaires, ignorées par Audiveris).
@@ -115,6 +119,13 @@ def _check_part(part: Part) -> list[Issue]:
             used.update(m.id for _, m, _ in run)
         start = end + 1
 
+    # Barres de mesure en trop ou manquées. Une paire « 2 + 2 » en 4/4 peut aussi être un
+    # passage à 2/4 : les deux questions restent (le chiffrage est demandé d'abord).
+    structural = _bar_issues(part, measures, wrong)
+    issues += structural
+    used.update(i.details["measure_id"] for i in structural)
+    used.update(i.details["next_id"] for i in structural if "next_id" in i.details)
+
     for _, measure, duration in wrong:
         if measure.id in used:
             continue
@@ -125,6 +136,57 @@ def _check_part(part: Part) -> list[Issue]:
             details={"read": str(duration), "expected": measure.expected_duration},
         ))
     return issues
+
+
+def _bar_issues(part: Part, measures: list[Measure],
+                wrong: list[tuple[int, Measure, Fraction]]) -> list[Issue]:
+    """Barre de mesure en trop (deux mesures à réunir) ou manquée (une mesure à couper)."""
+    issues = []
+    by_index = {index: (measure, duration) for index, measure, duration in wrong}
+    taken: set[int] = set()
+    for index, (measure, duration) in sorted(by_index.items()):
+        if index in taken or len(_voices(measure)) > 1:
+            continue
+        expected = Fraction(measure.expected_duration)
+        following = by_index.get(index + 1)
+        if (following is not None and len(_voices(following[0])) == 1
+                and following[0].expected_duration == measure.expected_duration
+                and duration < expected and following[1] < expected
+                and duration + following[1] == expected):
+            issues.append(Issue(
+                code="measures_merge_suspicious", part_id=part.id,
+                measure_numbers=[measure.number, following[0].number], severity="error",
+                confidence=0.6, symbol_ids=[],
+                details={"measure_id": measure.id, "next_id": following[0].id,
+                         "read": [str(duration), str(following[1])],
+                         "expected": measure.expected_duration}))
+            taken |= {index, index + 1}
+            continue
+        cut = _half_point(measure, expected) if duration == 2 * expected else None
+        if cut is not None:
+            issues.append(Issue(
+                code="measure_split_suspicious", part_id=part.id,
+                measure_numbers=[measure.number], severity="error", confidence=0.6,
+                symbol_ids=[cut.id],
+                details={"measure_id": measure.id, "after_id": cut.id,
+                         "expected": measure.expected_duration}))
+            taken.add(index)
+    return issues
+
+
+def _half_point(measure: Measure, expected: Fraction):
+    """Note après laquelle la mesure a exactement la durée attendue (première moitié d'une
+    mesure qui en vaut deux), ou None."""
+    total = Fraction(0)
+    for event in measure.events:
+        if event.value.get("chord") or event.value.get("grace"):
+            continue
+        total += event.duration or Fraction(0)
+        if total == expected:
+            return event
+        if total > expected:
+            return None
+    return None
 
 
 def _next_is_right(measures: list[Measure]) -> bool:

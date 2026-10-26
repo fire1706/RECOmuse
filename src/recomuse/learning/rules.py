@@ -82,7 +82,8 @@ def issue_signature(model: ScoreModel, issue: Issue) -> dict[str, Any] | None:
     elif issue.code in ("time_signature_missed", "time_signature_missing",
                         "measure_number_mismatch", "part_measures_missing",
                         "part_measures_extra", "part_time_signature_differs",
-                        "measure_empty"):
+                        "measure_empty", "measures_merge_suspicious",
+                        "measure_split_suspicious"):
         context = {}
     else:
         context = None   # pause au nombre inconnu (à taper), ou doute sans question

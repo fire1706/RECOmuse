@@ -140,7 +140,7 @@ export interface QuestionsState {
 /** Un symbole d'une mesure (note, silence, clé, armure, chiffrage, pause multiple). */
 export interface MeasureSymbol {
   id: string
-  kind: 'note' | 'rest' | 'clef' | 'key' | 'time' | 'multirest'
+  kind: 'note' | 'rest' | 'clef' | 'key' | 'time' | 'tempo' | 'multirest'
   /** Valeur du modèle ; « written » : durée écrite en noires (« 1/2 » = croche). */
   value: Record<string, unknown>
   confidence: number

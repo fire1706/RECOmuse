@@ -87,7 +87,9 @@
       "clef_sign_suspicious_change": "Cette clé a été lue comme une {{read}}, alors que la partie était en {{proposed}} jusqu'ici. Quelle clé voyez-vous ? (La réponse renomme les {{notes}} notes qui la suivent.)",
       "time_signature_missed_section": "Les mesures {{first}} à {{last}} ne correspondent pas au chiffrage, mais la suivante, si. Ce passage est-il à {{time}}, avant de revenir à {{back}} ?",
       "clef_sign_suspicious_missing": "Aucune clé n'a été lue au début de la partie : ces mesures s'affichent en clé de sol. La suite de la partie est en {{proposed}}. Est-ce aussi la clé du début ?",
-      "measure_empty": "Cette mesure est vide : la lecture n'y a rien trouvé. Que contient-elle ?"
+      "measure_empty": "Cette mesure est vide : la lecture n'y a rien trouvé. Que contient-elle ?",
+      "measures_merge_suspicious": "Les mesures {{first}} et {{second}} sont trop courtes, mais ensemble, elles font une mesure complète. La barre de mesure entre elles est-elle en trop ?",
+      "measure_split_suspicious": "Cette mesure dure le double de son chiffrage. Une barre de mesure a-t-elle été manquée après la note entourée ?"
     },
     "choices": {
       "clef_plain": "Une clé normale, sans 8",
@@ -113,7 +115,11 @@
       "time_section": "Oui, {{time}}, puis de nouveau {{back}}",
       "empty_rest": "Un silence d'une mesure",
       "empty_has_notes": "Des notes : je les ajoute à la main",
-      "empty_repeat": "La mesure d'avant, répétée (signe %)"
+      "empty_repeat": "La mesure d'avant, répétée (signe %)",
+      "merge_measures": "Oui, n'en faire qu'une mesure",
+      "measures_separate": "Non, ce sont bien deux mesures",
+      "split_measure": "Oui, couper la mesure là",
+      "measure_whole": "Non, c'est une seule mesure"
     },
     "compared_one": "Comparée à {{count}} autre partie du morceau.",
     "compared_other": "Comparée aux {{count}} autres parties du morceau.",
@@ -156,7 +162,13 @@
     "pack_already_imported": "Ce pack a déjà été importé.",
     "not_a_conductor": "Cette partition n'a qu'un instrument : il n'y a pas de parties à extraire.",
     "conductor_needs_parts": "Il faut au moins deux parties pour assembler un conducteur.",
-    "cancelled": "Lecture annulée."
+    "cancelled": "Lecture annulée.",
+    "no_next_measure": "C'est la dernière mesure : il n'y en a pas après pour la réunir.",
+    "merge_multirest": "Une pause de plusieurs mesures ne se réunit pas à une autre mesure.",
+    "merge_conflict": "Ces deux mesures ont chacune une clé, une armure ou un chiffrage : ce n'est sans doute pas une barre en trop.",
+    "split_at_end": "Choisissez une note avant la fin de la mesure pour la couper.",
+    "split_voices": "Cette mesure a plusieurs voix : coupez-la dans MuseScore.",
+    "split_not_an_event": "Choisissez une note ou un silence pour couper la mesure."
   },
   "scan": {
     "loading": "Chargement de la page…",
@@ -244,7 +256,31 @@
     "tie": "Lier à la note suivante",
     "addNote": "Ajouter une note après",
     "addRest": "Ajouter un silence après",
-    "remove": "Supprimer"
+    "remove": "Supprimer",
+    "tempo": "Tempo",
+    "tempoText": "Allegro…",
+    "tempoSpeed": "Noires par minute",
+    "mergeNext": "Réunir avec la mesure suivante",
+    "splitAfter": "Couper la mesure après cette note",
+    "expression": "Expression",
+    "articulations": {
+      "staccato": "Staccato",
+      "accent": "Accent",
+      "tenuto": "Tenuto",
+      "marcato": "Marcato",
+      "fermata": "Point d'orgue"
+    },
+    "dynamic": "Nuance",
+    "slur": {
+      "start": "Début de liaison",
+      "stop": "Fin de liaison"
+    },
+    "wedge": "Soufflet",
+    "wedges": {
+      "crescendo": "crescendo <",
+      "diminuendo": "diminuendo >"
+    },
+    "wedgeStop": "Fin du soufflet"
   },
   "transpose": {
     "button": "Transposer…",

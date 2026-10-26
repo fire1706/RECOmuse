@@ -155,6 +155,20 @@ describe('QuestionPanel', () => {
     expect(screen.getByRole('button', { name: 'Oui, 2/4, puis de nouveau 4/4' })).toBeInTheDocument()
   })
 
+  it('propose de réunir deux mesures trop courtes', async () => {
+    const merge = {
+      ...restQuestion, key: 'merge', code: 'measures_merge_suspicious', measure_numbers: [7, 8],
+      params: { read: ['2', '2'], expected: '4' },
+      choices: [
+        { id: 'accept', label: 'merge_measures', params: {}, input: null },
+        { id: 'keep', label: 'measures_separate', params: {}, input: null },
+      ],
+    }
+    render(<QuestionPanel api={fakeApi({ get_questions: async () => questionsState([merge]) })} scoreId={1} />)
+    expect(await screen.findByText(/Les mesures 7 et 8 sont trop courtes/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: "Oui, n'en faire qu'une mesure" })).toBeInTheDocument()
+  })
+
   it('parle anglais', async () => {
     await act(() => i18n.changeLanguage('en'))
     const api = fakeApi({ get_questions: async () => questionsState([noteQuestion]) })

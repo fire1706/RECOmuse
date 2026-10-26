@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from fractions import Fraction
 
+from recomuse.model import marks
 from recomuse.model.omr import OmrChord, OmrMeasure, OmrSheet, read_sheet
 from recomuse.model.score import Measure, Symbol, fraction_text
 from recomuse.recognition.musicxml import read_root
@@ -244,22 +245,79 @@ def _read_part(part: ET.Element, movement: int, part_index: int, omr_measures: l
         measure.expected_duration = fraction_text(expected)
         measure.marks = _rehearsal_marks(element)
 
-        # Notes et silences.
+        # Notes et silences, et les indications écrites entre eux (nuances, soufflets,
+        # tempo), lues dans l'ordre : une nuance va à la note qui la suit.
         chord_leader: Symbol | None = None
-        for k, note in enumerate(element.findall("note")):
-            symbol = _note(note, f"{ident}.e{k}", divisions, geometry)
+        pending: dict = {}
+        k = 0
+        for child in element:
+            if child.tag == "direction":
+                _read_direction(child, pending, measure, geometry)
+                continue
+            if child.tag != "note":
+                continue
+            symbol = _note(child, f"{ident}.e{k}", divisions, geometry)
+            k += 1
             if symbol.value.get("chord") and chord_leader is not None:
                 # Même accord : même position horizontale que la première note.
                 symbol.value["_x"] = chord_leader.value.get("_x")
             else:
                 chord_leader = symbol
+                if pending and not symbol.value.get("grace"):
+                    symbol.value.update(pending)
+                    pending = {}
             measure.events.append(symbol)
+        leaders = [e for e in measure.events if not e.value.get("chord")]
+        if pending and leaders:
+            # Indication après la dernière note de la mesure : elle va à cette note.
+            leaders[-1].value.update(pending)
         clef = current_clef
         _locate_events(measure.events, geometry, clef)
         for symbol in measure.events:
             symbol.value.pop("_x", None)
         measures.append(measure)
     return measures
+
+
+def _read_direction(direction: ET.Element, pending: dict, measure: Measure,
+                    geometry: _Geometry) -> None:
+    """Une indication du MusicXML : nuance et début de soufflet (pour la note suivante,
+    dans `pending`), fin de soufflet (sur la note précédente), tempo (en tête de mesure)."""
+    for item in direction.iter():
+        if item.tag == "dynamics":
+            names = [d.tag for d in item if d.tag in marks.DYNAMICS]
+            if names:
+                pending["dynamic"] = names[0]
+        elif item.tag == "wedge":
+            kind = item.get("type")
+            if kind in marks.WEDGES:
+                pending["wedge_start"] = kind
+            elif kind == "stop":
+                previous = [e for e in measure.events if not e.value.get("chord")]
+                if previous:
+                    previous[-1].value["wedge_stop"] = True
+                else:
+                    pending["wedge_stop"] = True
+    tempo = _tempo(direction)
+    if tempo and not any(s.kind == "tempo" for s in measure.attributes):
+        _attribute(measure, geometry, "tempo", tempo, 0)
+
+
+def _tempo(direction: ET.Element) -> dict | None:
+    """Indication de tempo : texte au-dessus de la portée qui en est une (« Allegro »),
+    et/ou métronome (« ♩ = 96 »). None sinon (lettre de répétition, « solo »...)."""
+    words = " ".join((w.text or "").strip() for w in direction.iter("words")).strip()
+    metronome = direction.find(".//metronome")
+    value: dict = {}
+    if words and direction.get("placement") != "below" and marks.is_tempo_text(words):
+        value["text"] = words
+    if metronome is not None:
+        beat = marks.beat_duration(metronome.findtext("beat-unit"),
+                                   metronome.find("beat-unit-dot") is not None)
+        per_minute = _int((metronome.findtext("per-minute") or "").strip())
+        if beat is not None and per_minute:
+            value |= {"beat": fraction_text(beat), "per_minute": per_minute}
+    return value or None
 
 
 def _rehearsal_marks(element: ET.Element) -> list[str]:
@@ -323,6 +381,7 @@ def _note(note: ET.Element, ident: str, divisions: int, geometry: _Geometry) -> 
         value = {"duration": fraction_text(duration), "dots": dots, "voice": voice,
                  "full_measure": rest.get("measure") == "yes"}
         kind = "rest"
+        value |= _notations(note)
     else:
         ties = {t.get("type") for t in note.findall("tie")}
         value = {
@@ -334,9 +393,30 @@ def _note(note: ET.Element, ident: str, divisions: int, geometry: _Geometry) -> 
             "head": HEAD_OF_TYPE.get(written_type or "", "black"),
         }
         kind = "note"
+        value |= _notations(note)
     value["_x"] = x   # position attendue, retirée après l'appariement
     return Symbol(id=ident, kind=kind, value=value, page=geometry.page, source="audiveris",
                   confidence=UNKNOWN_CONFIDENCE, bbox=None)
+
+
+def _notations(note: ET.Element) -> dict:
+    """Liaisons d'expression et articulations d'une note (champs absents s'il n'y en a pas,
+    pour garder des valeurs courtes)."""
+    value: dict = {}
+    slurs = {slur.get("type") for slur in note.iter("slur")}
+    if "start" in slurs:
+        value["slur_start"] = True
+    if "stop" in slurs:
+        value["slur_stop"] = True
+    found = []
+    for group in note.iter("notations"):
+        for item in group.iter():
+            name = marks.MUSICXML_ARTICULATIONS.get(item.tag)
+            if name and name not in found:
+                found.append(name)
+    if found:
+        value["articulations"] = found
+    return value
 
 
 def _staff_pitch(symbol: Symbol, clef: dict | None) -> float | None:

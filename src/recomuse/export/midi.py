@@ -6,8 +6,14 @@ celui de son instrument (table des instruments, numéros General MIDI) ; les per
 jouent sur le canal 10.
 
 Une piste par portée, plus une piste de mesure (tempo, chiffrages). Le tempo vient de
-l'indication écrite si elle donne un nombre (« ♩ = 120 »), sinon 100 à la noire.
+l'indication écrite si elle donne un nombre (« ♩ = 120 »), sinon 100 à la noire ; chaque
+indication de tempo de la partition (métronome, ou mot connu : « Andante » ≈ 80) le change.
 Les petites notes ne sont pas jouées ; les notes liées n'en font qu'une.
+
+Signes d'expression (model/marks.py) : les nuances donnent la force des notes (pp = 33,
+mf = 80, ff = 112), un soufflet la fait monter ou descendre note après note jusqu'à la
+nuance suivante (ou de 16 sans nuance), un accent joue plus fort, un staccato plus court.
+Le point d'orgue n'est pas joué (il décalerait les parties entre elles).
 """
 
 import re
@@ -16,11 +22,17 @@ from fractions import Fraction
 
 from recomuse.export.notation import exported_parts
 from recomuse.instruments.table import Instrument, Variant, midi_number
-from recomuse.model.score import Measure, ScoreModel
+from recomuse.model import marks
+from recomuse.model.score import Measure, Part, ScoreModel, Symbol
 
 TICKS_PER_QUARTER = 480
 DEFAULT_TEMPO = 100                # noires par minute
-VELOCITY = 80
+VELOCITY = marks.DEFAULT_VELOCITY
+# Effet des articulations : force ajoutée, et part de la durée écrite réellement jouée.
+ACCENT_BOOST = {"accent": 15, "marcato": 22}
+SHORTER = {"staccato": Fraction(1, 2), "staccatissimo": Fraction(1, 4)}
+# Soufflet sans nuance d'arrivée : de combien la force monte ou descend.
+WEDGE_STEP = 16
 DRUM_CHANNEL = 9                   # le « canal 10 » des musiciens (numéroté à partir de 0)
 SNARE, HI_HAT = 38, 42             # sons de batterie (têtes normales, têtes en croix)
 
@@ -51,7 +63,7 @@ def model_to_midi(model: ScoreModel, instrument: Instrument | None = None,
             this_channel = channel
             channel = channel + 1 if channel + 1 != DRUM_CHANNEL else channel + 2
             channel %= 16
-        notes = _notes(staff.measures, timeline, shift, percussion)
+        notes = _notes(staff.measures, timeline, shift, percussion, _velocities(staff))
         tracks.append(_track(staff.name or model.instrument or "", this_channel, program,
                              notes, percussion))
     header = struct.pack(">4sIHHH", b"MThd", 6, 1, len(tracks), TICKS_PER_QUARTER)
@@ -101,9 +113,56 @@ def tempo_of(text: str | None) -> int:
 # --- Notes --------------------------------------------------------------------------------
 
 
-def _notes(measures: list[Measure], timeline, shift: int,
-           percussion: bool) -> list[tuple[int, int, int]]:
-    """Notes jouées : (début, fin, hauteur MIDI), en tics."""
+def _velocities(part: Part) -> dict[str, int]:
+    """Force (vélocité MIDI) de chaque note : la nuance en cours, rampe des soufflets, et
+    supplément des accents."""
+    events = [e for m in part.measures for e in m.events if not e.value.get("grace")]
+    index = {e.id: k for k, e in enumerate(events)}
+    wedges: dict[int, tuple[int, str]] = {}       # rang de début → (rang de fin, sens)
+    for span in marks.spans(part):
+        if span.kind == "wedge" and span.start.id in index and span.end.id in index:
+            wedges[index[span.start.id]] = (index[span.end.id], span.form or "crescendo")
+    result: dict[str, int] = {}
+    level = VELOCITY
+    ramp: tuple[int, int, int, int] | None = None     # (début, fin, force de départ, arrivée)
+    for k, event in enumerate(events):
+        dynamic = event.value.get("dynamic")
+        if dynamic in marks.DYNAMICS:
+            level = marks.DYNAMICS[dynamic]
+        if k in wedges:
+            end, form = wedges[k]
+            step = WEDGE_STEP if form == "crescendo" else -WEDGE_STEP
+            target = _arrival(events, end)
+            # La nuance d'arrivée doit aller dans le sens du soufflet (sinon une nuance mal
+            # lue ou manquée ferait descendre un crescendo).
+            if target is None or (target - level) * step <= 0:
+                target = level + step
+            ramp = (k, end, level, max(1, min(127, target)))
+        velocity = level
+        if ramp is not None:
+            start, end, first, last = ramp
+            velocity = round(first + (last - first) * (k - start) / max(1, end - start))
+            if k >= end:
+                level, ramp = last, None
+        boost = max((ACCENT_BOOST.get(a, 0) for a in event.value.get("articulations") or []),
+                    default=0)
+        result[event.id] = max(1, min(127, velocity + boost))
+    return result
+
+
+def _arrival(events: list[Symbol], end: int) -> int | None:
+    """Nuance écrite juste après la fin d'un soufflet (là où il mène), ou None."""
+    for event in events[end + 1:end + 3]:
+        dynamic = event.value.get("dynamic")
+        if dynamic in marks.DYNAMICS:
+            return marks.DYNAMICS[dynamic]
+    return None
+
+
+def _notes(measures: list[Measure], timeline, shift: int, percussion: bool,
+           velocities: dict[str, int] | None = None) -> list[tuple[int, int, int, int]]:
+    """Notes jouées : (début, fin, hauteur MIDI, force), en tics."""
+    velocities = velocities or {}
     notes: list[list[int]] = []
     open_ties: dict[int, list[int]] = {}      # hauteur → note liée vers la suivante
     for measure, (start, _) in zip(measures, timeline, strict=False):
@@ -132,17 +191,20 @@ def _notes(measures: list[Measure], timeline, shift: int,
                                         value["octave"]) + shift
                 if not 0 <= pitch <= 127:
                     continue
-                first, last = _ticks(begin), _ticks(begin + duration)
+                played = duration * min((SHORTER.get(a, Fraction(1)) for a in
+                                          value.get("articulations") or []),
+                                         default=Fraction(1))
+                first, last = _ticks(begin), _ticks(begin + played)
                 tied = open_ties.pop(pitch, None)
                 if value.get("tie_stop") and tied is not None and tied[1] == first:
                     tied[1] = last                       # la note liée continue
                     note = tied
                 else:
-                    note = [first, last, pitch]
+                    note = [first, last, pitch, velocities.get(event.id, VELOCITY)]
                     notes.append(note)
                 if value.get("tie_start"):
                     open_ties[pitch] = note
-    return [(a, b, p) for a, b, p in notes if b > a]
+    return [(a, b, p, v) for a, b, p, v in notes if b > a]
 
 
 # --- Écriture du fichier ------------------------------------------------------------------
@@ -176,9 +238,16 @@ def _text(kind: int, text: str) -> bytes:
 
 def _conductor(model: ScoreModel, measures: list[Measure], timeline) -> bytes:
     """Piste de mesure : titre, tempo, chiffrages."""
-    tempo = 60_000_000 // tempo_of(model.tempo)
-    events = [(0, 0, _text(0x03, model.title or "")),
-              (0, 1, b"\xff\x51\x03" + tempo.to_bytes(3, "big"))]
+    first = next((s.value for s in measures[0].attributes if s.kind == "tempo"),
+                 None) if measures else None
+    speed = (marks.quarters_per_minute(first, guess_from_text=True) if first else None) \
+        or tempo_of(model.tempo)
+    events = [(0, 0, _text(0x03, model.title or "")), (0, 1, _tempo_event(speed))]
+    for measure, (start, _) in zip(measures[1:], timeline[1:], strict=False):
+        tempo = next((s for s in measure.attributes if s.kind == "tempo"), None)
+        change = marks.quarters_per_minute(tempo.value, guess_from_text=True) if tempo else None
+        if change:
+            events.append((_ticks(start), 1, _tempo_event(change)))
     for measure, (start, _) in zip(measures, timeline, strict=False):
         time = next((s for s in measure.attributes if s.kind == "time"), None)
         if time is not None:
@@ -189,11 +258,17 @@ def _conductor(model: ScoreModel, measures: list[Measure], timeline) -> bytes:
     return _chunk(events)
 
 
+def _tempo_event(quarters_per_minute: float) -> bytes:
+    """Changement de tempo MIDI (microsecondes par noire)."""
+    speed = max(20.0, min(400.0, quarters_per_minute))
+    return b"\xff\x51\x03" + int(60_000_000 / speed).to_bytes(3, "big")
+
+
 def _track(name: str, channel: int, program: int, notes, percussion: bool) -> bytes:
     events = [(0, 0, _text(0x03, name))]
     if not percussion:
         events.append((0, 1, bytes([0xC0 | channel, program & 0x7F])))
-    for start, end, pitch in notes:
-        events.append((start, 3, bytes([0x90 | channel, pitch, VELOCITY])))
+    for start, end, pitch, velocity in notes:
+        events.append((start, 3, bytes([0x90 | channel, pitch, velocity])))
         events.append((end, 2, bytes([0x80 | channel, pitch, 0])))   # arrêt avant reprise
     return _chunk(events)

@@ -7,13 +7,20 @@ sur une note du rendu retrouve ainsi le symbole du modèle, et inversement.
 Ce MEI sert à l'AFFICHAGE : il reste fidèle au modèle tel qu'il a été lu, erreurs
 comprises (une mesure trop longue reste trop longue), pour que le musicien voie ce que le
 logiciel a compris. Les ligatures (croches reliées) ne sont pas encore lues : les croches
-sont dessinées séparées. L'export pour MuseScore viendra à la tâche 11.
+sont dessinées séparées.
+
+Signes d'expression (model/marks.py) : les articulations sont dans la note ; liaisons,
+soufflets, nuances, points d'orgue et tempo sont des « événements de contrôle » MEI, écrits
+à la fin de la mesure où ils commencent et rattachés à leurs notes par identifiant (une
+liaison peut finir dans une mesure suivante).
 """
 
 import re
+from collections import defaultdict
 from fractions import Fraction
 from xml.sax.saxutils import escape, quoteattr
 
+from recomuse.model import marks
 from recomuse.model.score import Measure, Part, ScoreModel, Symbol
 from recomuse.vector.pitch import key_alter
 
@@ -35,6 +42,7 @@ class _Ids:
         self.symbols: dict[str, str] = {}    # identifiant MEI → identifiant du symbole
         self.measures: dict[str, str] = {}   # identifiant MEI → identifiant de la mesure
         self._used: set[str] = set()
+        self._by_symbol: dict[str, str] = {}
 
     def make(self, prefix: str, raw: str, table: dict[str, str]) -> str:
         base = f"{prefix}-{NCNAME.sub('_', raw)}"
@@ -45,6 +53,13 @@ class _Ids:
         self._used.add(name)
         table[name] = raw
         return name
+
+    def symbol(self, raw: str) -> str:
+        """Identifiant MEI d'un symbole, toujours le même (une liaison qui finit plus loin
+        désigne une note pas encore écrite)."""
+        if raw not in self._by_symbol:
+            self._by_symbol[raw] = self.make("s", raw, self.symbols)
+        return self._by_symbol[raw]
 
 
 def model_to_mei(model: ScoreModel) -> dict:
@@ -66,10 +81,11 @@ def model_to_mei(model: ScoreModel) -> dict:
     lines.append(_score_def(model, parts))
     lines.append("<section>")
     states = [_State.at_start(part) for part in parts]
+    controls = _control_events(model, parts, ids)
     for rank in range(len(parts[0].measures) if parts else 0):
         measures = [part.measures[rank] for part in parts]
         lines += _changes(measures, states)
-        lines.append(_measure(measures, states, ids))
+        lines.append(_measure(measures, states, ids, controls.get(rank, [])))
     lines += ["</section>", "</score></mdiv></body></music>", "</mei>"]
     return {"mei": "\n".join(lines), "symbols": ids.symbols, "measures": ids.measures}
 
@@ -158,13 +174,59 @@ def _changes(measures: list[Measure], states: list[_State]) -> list[str]:
     return out
 
 
-def _measure(measures: list[Measure], states: list[_State], ids: _Ids) -> str:
+def _measure(measures: list[Measure], states: list[_State], ids: _Ids,
+             controls: list[str]) -> str:
     first = measures[0]
     measure_id = ids.make("m", first.id, ids.measures)
     staves = []
     for n, (measure, state) in enumerate(zip(measures, states, strict=True), 1):
         staves.append(f'<staff n="{n}">{_layers(measure, state, ids)}</staff>')
-    return f'<measure xml:id="{measure_id}" n="{first.number}">' + "".join(staves) + "</measure>"
+    return (f'<measure xml:id="{measure_id}" n="{first.number}">' + "".join(staves)
+            + "".join(controls) + "</measure>")
+
+
+def _control_events(model: ScoreModel, parts: list[Part], ids: _Ids) -> dict[int, list[str]]:
+    """Liaisons, soufflets, nuances, points d'orgue et tempo, rangés par mesure (rang)."""
+    out: dict[int, list[str]] = defaultdict(list)
+    for n, part in enumerate(parts, 1):
+        for rank, measure in enumerate(part.measures):
+            if n == 1:
+                tempo = _attribute(measure, "tempo")
+                value = tempo.value if tempo else (
+                    {"text": model.tempo} if rank == 0 and model.tempo else None)
+                if value:
+                    out[rank].append(_tempo(value))
+            for event in measure.events:
+                name = ids.symbol(event.id)
+                if event.value.get("dynamic"):
+                    out[rank].append(f'<dynam staff="{n}" startid="#{name}">'
+                                     f'{escape(event.value["dynamic"])}</dynam>')
+                if "fermata" in (event.value.get("articulations") or []):
+                    out[rank].append(f'<fermata staff="{n}" startid="#{name}"/>')
+        for span in marks.spans(part):
+            ends = f'startid="#{ids.symbol(span.start.id)}" endid="#{ids.symbol(span.end.id)}"'
+            if span.kind == "slur":
+                out[span.start_rank].append(f'<slur staff="{n}" {ends}/>')
+            else:
+                form = "cres" if span.form == "crescendo" else "dim"
+                out[span.start_rank].append(f'<hairpin form="{form}" staff="{n}" {ends}/>')
+    return out
+
+
+def _tempo(value: dict) -> str:
+    """Indication de tempo au début de la mesure : texte et métronome (« ♩ = 96 »)."""
+    attrs = ' staff="1" tstamp="1" place="above"'
+    per_minute, beat = value.get("per_minute"), value.get("beat")
+    unit = marks.beat_unit(Fraction(beat)) if beat else None
+    if per_minute and unit:
+        mei_unit = {"whole": "1", "half": "2", "quarter": "4", "eighth": "8", "16th": "16"}
+        attrs += f' mm="{per_minute}" mm.unit="{mei_unit[unit[0]]}"'
+        if unit[1]:
+            attrs += ' mm.dots="1"'
+    text = escape(value.get("text") or "")
+    if per_minute and unit:
+        text = (text + " " if text else "") + f"\u2669 = {per_minute}"
+    return f"<tempo{attrs}>{text}</tempo>"
 
 
 def _layers(measure: Measure, state: _State, ids: _Ids) -> str:
@@ -177,7 +239,7 @@ def _layers(measure: Measure, state: _State, ids: _Ids) -> str:
         state.clef = clef.value
     multirest = _attribute(measure, "multirest")
     if multirest is not None:
-        name = ids.make("s", multirest.id, ids.symbols)
+        name = ids.symbol(multirest.id)
         count = multirest.value.get("count") or 1
         return f'<layer n="1">{clef_change}<multiRest xml:id="{name}" num="{count}"/></layer>'
     voices: dict[int, list[Symbol]] = {}
@@ -252,7 +314,7 @@ def _dur_attrs(symbol: Symbol) -> str:
 def _group(group: list[Symbol], fifths: int, accidentals: dict, ids: _Ids) -> str:
     head = group[0]
     if head.kind == "rest":
-        name = ids.make("s", head.id, ids.symbols)
+        name = ids.symbol(head.id)
         if head.value.get("full_measure"):
             return f'<mRest xml:id="{name}"/>'
         return f'<rest xml:id="{name}"{_dur_attrs(head)}/>'
@@ -265,7 +327,7 @@ def _group(group: list[Symbol], fifths: int, accidentals: dict, ids: _Ids) -> st
 
 def _note(note: Symbol, fifths: int, accidentals: dict, ids: _Ids) -> str:
     value = note.value
-    name = ids.make("s", note.id, ids.symbols)
+    name = ids.symbol(note.id)
     step, octave = value.get("step"), value.get("octave")
     if step is None or octave is None:     # percussion : hauteur sans nom de note
         step, octave = "B", 4
@@ -286,4 +348,9 @@ def _note(note: Symbol, fifths: int, accidentals: dict, ids: _Ids) -> str:
     elif value.get("tie_stop"):
         tie = ' tie="t"'
     head = ' head.shape="x"' if value.get("head") == "x" else ""
-    return f'<note xml:id="{name}" pname="{step.lower()}" oct="{octave}"{accid}{tie}{head}/>'
+    opening = f'<note xml:id="{name}" pname="{step.lower()}" oct="{octave}"{accid}{tie}{head}'
+    artic = " ".join(marks.MEI_ARTICULATIONS[a] for a in value.get("articulations") or []
+                     if a in marks.MEI_ARTICULATIONS)
+    if artic:
+        return f'{opening}><artic artic="{artic}"/></note>'
+    return f"{opening}/>"

@@ -169,6 +169,11 @@ export default function QuestionPanel({ api, scoreId, onAnswered, onFocus }: Que
   }
 
   const params = formatParams(question.params, language)
+  if (question.code === 'measures_merge_suspicious') {
+    // Les deux mesures qui n'en feraient qu'une.
+    params.first = question.measure_numbers[0]
+    params.second = question.measure_numbers[1]
+  }
   if (question.code === 'clef_sign_suspicious') {
     // Noms des clés (« clé de sol »...), traduits.
     params.read = t(`questions.clefs.${String(question.params.read)}`)

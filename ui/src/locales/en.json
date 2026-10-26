@@ -87,7 +87,9 @@
       "clef_sign_suspicious_change": "This clef was read as a {{read}}, while the part was in {{proposed}} until here. Which clef do you see? (The answer renames the {{notes}} notes that follow it.)",
       "time_signature_missed_section": "Bars {{first}} to {{last}} do not match the time signature, but the next one does. Is this passage in {{time}}, before going back to {{back}}?",
       "clef_sign_suspicious_missing": "No clef was read at the start of the part: these bars are shown in treble clef. The rest of the part is in {{proposed}}. Is it also the clef at the start?",
-      "measure_empty": "This bar is empty: the reading found nothing in it. What does it contain?"
+      "measure_empty": "This bar is empty: the reading found nothing in it. What does it contain?",
+      "measures_merge_suspicious": "Bars {{first}} and {{second}} are too short, but together they make one full bar. Is the barline between them extra?",
+      "measure_split_suspicious": "This bar lasts twice its time signature. Was a barline missed after the circled note?"
     },
     "choices": {
       "clef_plain": "A normal clef, without an 8",
@@ -113,7 +115,11 @@
       "time_section": "Yes, {{time}}, then {{back}} again",
       "empty_rest": "A one-bar rest",
       "empty_has_notes": "Notes: I will add them by hand",
-      "empty_repeat": "The previous bar, repeated (% sign)"
+      "empty_repeat": "The previous bar, repeated (% sign)",
+      "merge_measures": "Yes, make it one bar",
+      "measures_separate": "No, these are two bars",
+      "split_measure": "Yes, split the bar there",
+      "measure_whole": "No, it is a single bar"
     },
     "compared_one": "Compared with {{count}} other part of the piece.",
     "compared_other": "Compared with the {{count}} other parts of the piece.",
@@ -156,7 +162,13 @@
     "pack_already_imported": "This pack has already been imported.",
     "not_a_conductor": "This score has a single instrument: there are no parts to extract.",
     "conductor_needs_parts": "At least two parts are needed to assemble a conductor score.",
-    "cancelled": "Reading cancelled."
+    "cancelled": "Reading cancelled.",
+    "no_next_measure": "This is the last bar: there is none after it to join.",
+    "merge_multirest": "A multi-bar rest cannot be joined with another bar.",
+    "merge_conflict": "These two bars each have a clef, key or time signature: this is probably not an extra barline.",
+    "split_at_end": "Choose a note before the end of the bar to split it.",
+    "split_voices": "This bar has several voices: split it in MuseScore.",
+    "split_not_an_event": "Choose a note or a rest to split the bar."
   },
   "scan": {
     "loading": "Loading the page…",
@@ -244,7 +256,31 @@
     "tie": "Tie to the next note",
     "addNote": "Add a note after",
     "addRest": "Add a rest after",
-    "remove": "Delete"
+    "remove": "Delete",
+    "tempo": "Tempo",
+    "tempoText": "Allegro…",
+    "tempoSpeed": "Quarter notes per minute",
+    "mergeNext": "Join with the next bar",
+    "splitAfter": "Split the bar after this note",
+    "expression": "Expression",
+    "articulations": {
+      "staccato": "Staccato",
+      "accent": "Accent",
+      "tenuto": "Tenuto",
+      "marcato": "Marcato",
+      "fermata": "Fermata"
+    },
+    "dynamic": "Dynamic",
+    "slur": {
+      "start": "Slur start",
+      "stop": "Slur end"
+    },
+    "wedge": "Hairpin",
+    "wedges": {
+      "crescendo": "crescendo <",
+      "diminuendo": "diminuendo >"
+    },
+    "wedgeStop": "Hairpin end"
   },
   "transpose": {
     "button": "Transpose…",

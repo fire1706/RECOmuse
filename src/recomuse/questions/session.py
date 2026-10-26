@@ -23,6 +23,7 @@ from typing import Any
 from recomuse import library, paths
 from recomuse.learning import rules
 from recomuse.learning.corrections import CorrectionService
+from recomuse.model.measures import merge_with_next, split_after
 from recomuse.model.score import ScoreModel
 from recomuse.model.store import load_model
 from recomuse.questions.images import question_image
@@ -31,6 +32,9 @@ from recomuse.validation.comparison import compare_parts, part_refs
 from recomuse.validation.geometry import PageGeometries
 from recomuse.validation.issues import Issue, ValidationReport
 from recomuse.validation.validator import tesseract_number_reader, validate
+
+# Changements du découpage en mesures qu'une réponse peut demander.
+STRUCTURE_PLANS = {"merge_next": merge_with_next, "split_after": split_after}
 
 # Nombre maximal de réponses données d'un coup par les règles apprises (garde-fou).
 MAX_RULE_ANSWERS = 200
@@ -166,7 +170,14 @@ class QuestionSession:
         """Applique les corrections d'une réponse et l'enregistre, avec la signature de
         la question (pour les règles apprises)."""
         ids: list[int] = []
-        if fixes or additions:
+        if choice.structure is not None:
+            # Barre de mesure en trop ou manquée : le découpage en mesures change.
+            plan = STRUCTURE_PLANS[choice.structure["op"]](self._model(score_id),
+                                                           choice.structure["target"])
+            ids = [self._service.restructure(
+                score_id, plan, source="question" if answered_by == "user" else "rule",
+                reason=question.code if answered_by == "user" else f"rule:{question.code}")]
+        elif fixes or additions:
             ids = self._service.apply_group(
                 score_id, [(f.symbol_id, f.value) for f in fixes],
                 source="question" if answered_by == "user" else "rule",

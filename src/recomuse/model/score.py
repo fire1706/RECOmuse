@@ -26,21 +26,28 @@ from typing import Any, Literal
 # Version du format du modèle (pour pouvoir le faire évoluer plus tard).
 MODEL_VERSION = 1
 
-SymbolKind = Literal["note", "rest", "clef", "key", "time", "multirest"]
+SymbolKind = Literal["note", "rest", "clef", "key", "time", "multirest", "tempo"]
 # Qui a donné sa valeur actuelle au symbole : lecture vectorielle, Audiveris, l'utilisateur
 # (question ou édition), une règle apprise, ou le validateur musical.
 SymbolSource = Literal["vector", "audiveris", "user", "rule", "validator", "transposed"]
+
+# Signes d'expression portés par une note ou un silence (voir model/marks.py).
+EXPRESSION_FIELDS = ("slur_start", "slur_stop", "articulations", "dynamic", "wedge_start",
+                     "wedge_stop")
 
 # Champs de la valeur de chaque type de symbole (documentation et contrôle).
 VALUE_FIELDS: dict[str, tuple[str, ...]] = {
     # step : C D E F G A B ; alter : -1 bémol, 0, +1 dièse ; duration : « 1/2 »...
     "note": ("step", "octave", "alter", "duration", "dots", "voice", "chord", "grace",
-             "tie_start", "tie_stop", "tuplet", "head"),
-    "rest": ("duration", "dots", "voice", "full_measure"),
+             "tie_start", "tie_stop", "tuplet", "head") + EXPRESSION_FIELDS,
+    "rest": ("duration", "dots", "voice", "full_measure") + EXPRESSION_FIELDS,
     "clef": ("sign", "line", "octave_change"),   # sign : G, F, C, percussion ; line : 1 à 5
     "key": ("fifths",),                   # > 0 dièses, < 0 bémols
     "time": ("beats", "beat_type"),
     "multirest": ("count",),
+    # Indication de tempo : texte (« Allegro »), pulsation en noires (« 1 », « 3/2 ») et
+    # nombre de pulsations par minute (métronome), chacun facultatif.
+    "tempo": ("text", "beat", "per_minute"),
 }
 
 
@@ -212,22 +219,26 @@ class ScoreModel:
 
     @classmethod
     def from_dict(cls, data: dict) -> "ScoreModel":
-        def symbol(d: dict) -> Symbol:
-            bbox = tuple(d["bbox"]) if d.get("bbox") is not None else None
-            return Symbol(**{**d, "bbox": bbox})
-
-        def measure(d: dict) -> Measure:
-            bbox = tuple(d["bbox"]) if d.get("bbox") is not None else None
-            return Measure(**{**d, "bbox": bbox,
-                              "attributes": [symbol(s) for s in d["attributes"]],
-                              "events": [symbol(s) for s in d["events"]]})
-
         return cls(**{
             **data,
-            "parts": [Part(**{**p, "measures": [measure(m) for m in p["measures"]]})
+            "parts": [Part(**{**p, "measures": [measure_from_dict(m) for m in p["measures"]]})
                       for p in data["parts"]],
             "pages": [PageInfo(**p) for p in data["pages"]],
         })
+
+
+def _symbol_from_dict(d: dict) -> Symbol:
+    bbox = tuple(d["bbox"]) if d.get("bbox") is not None else None
+    return Symbol(**{**d, "bbox": bbox})
+
+
+def measure_from_dict(d: dict) -> Measure:
+    """Mesure (et ses symboles) à partir de sa version JSON (modèle enregistré, ou mesure
+    gardée dans le journal par une fusion ou une coupure de mesures)."""
+    bbox = tuple(d["bbox"]) if d.get("bbox") is not None else None
+    return Measure(**{**d, "bbox": bbox,
+                      "attributes": [_symbol_from_dict(s) for s in d["attributes"]],
+                      "events": [_symbol_from_dict(s) for s in d["events"]]})
 
 
 def fraction_text(value: Fraction | None) -> str | None:

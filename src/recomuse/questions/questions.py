@@ -40,6 +40,8 @@ CODE_ORDER = [
     "time_signature_missed",
     "part_time_signature_differs",
     "multirest_missed",
+    "measures_merge_suspicious",
+    "measure_split_suspicious",
     "measure_empty",
     "measure_number_mismatch",
     "part_measures_missing",
@@ -73,6 +75,9 @@ class Choice:
     multirest_id: str | None = None
     # Mesure vide : le silence à y mettre avant la pause multiple tapée.
     fill_rest: NewSymbol | None = None
+    # Changement du découpage en mesures (model/measures.py) : {"op": "merge_next",
+    # "target": id de la mesure} ou {"op": "split_after", "target": id de la note}.
+    structure: dict | None = None
 
     def changes(self, value: int | None = None) -> tuple[list[Fix], list[NewSymbol]]:
         """Corrections à appliquer si l'utilisateur choisit cette réponse."""
@@ -344,6 +349,36 @@ def _multirest(model: ScoreModel, issue: Issue) -> Question | None:
     return question
 
 
+def _merge(model: ScoreModel, issue: Issue) -> Question | None:
+    """Deux mesures trop courtes qui n'en font qu'une : la barre entre elles est-elle en
+    trop ?"""
+    try:
+        _, measure = model.find_measure(issue.details["measure_id"])
+    except KeyError:
+        return None
+    choices = [Choice("accept", "merge_measures",
+                      structure={"op": "merge_next", "target": measure.id}),
+               Choice("keep", "measures_separate")]
+    return _question(model, issue, list(measure.events), params={
+        "read": issue.details.get("read"), "expected": issue.details.get("expected")},
+        choices=choices, key=f"measures_merge:{issue.part_id}:{measure.id}", measure=measure)
+
+
+def _split(model: ScoreModel, issue: Issue) -> Question | None:
+    """Une mesure qui en vaut deux : une barre de mesure a-t-elle été manquée ici ?"""
+    try:
+        _, measure = model.find_measure(issue.details["measure_id"])
+        cut = model.find(issue.details["after_id"])[2]
+    except KeyError:
+        return None
+    choices = [Choice("accept", "split_measure",
+                      structure={"op": "split_after", "target": cut.id}),
+               Choice("keep", "measure_whole")]
+    return _question(model, issue, [cut], params={"expected": issue.details.get("expected")},
+                     choices=choices, key=f"measure_split:{issue.part_id}:{measure.id}",
+                     measure=measure)
+
+
 def _empty_measure(model: ScoreModel, issue: Issue) -> Question | None:
     """Mesure vide : un silence d'une mesure, une pause de plusieurs mesures, la mesure
     précédente répétée (signe « % », courant dans les parties de fanfare), ou des notes
@@ -387,6 +422,8 @@ BUILDERS = {
     "part_measures_extra": _multirest,
     "part_time_signature_differs": _time_signature,
     "measure_empty": _empty_measure,
+    "measures_merge_suspicious": _merge,
+    "measure_split_suspicious": _split,
 }
 
 

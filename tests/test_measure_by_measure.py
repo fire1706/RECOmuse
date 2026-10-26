@@ -77,8 +77,11 @@ def two_four_section():
 
 def test_a_bounded_section_proposes_the_change_and_the_return():
     model = two_four_section()
-    [question], unasked = build_questions(model, validate(model))
+    questions, unasked = build_questions(model, validate(model))
     assert unasked == []
+    # « 2 + 2 » en 4/4 : passage à 2/4, ou barre de mesure en trop. Le chiffrage d'abord.
+    assert [q.code for q in questions] == ["time_signature_missed", "measures_merge_suspicious"]
+    question = questions[0]
     assert question.code == "time_signature_missed"
     assert question.params == {"time": "2/4", "measures": 2, "back": "4/4",
                                "first": 3, "last": 4}
@@ -92,7 +95,7 @@ def test_a_bounded_section_proposes_the_change_and_the_return():
 
 def test_answering_the_section_leaves_no_cascade(conn, session, score_id):
     save_model(conn, score_id, two_four_section())
-    [question] = session.state(score_id)["questions"]
+    question = session.state(score_id)["questions"][0]
     state = session.answer(score_id, question["key"], "accept")
     # Une seule réponse : plus aucune question ni mesure à vérifier, et les mesures 5 et
     # 6 sont de nouveau attendues à 4 temps.
@@ -104,13 +107,14 @@ def test_answering_the_section_leaves_no_cascade(conn, session, score_id):
 
 def test_an_open_ended_change_still_needs_three_measures():
     # Deux mesures de 2 temps en fin de partie : pas de retour visible, pas assez pour
-    # conclure (ce peut être deux mesures mal lues).
+    # conclure à un changement de chiffrage ; mais à deux, elles font une mesure : on
+    # demande si la barre entre elles est en trop.
     model = model_of([measure("m1", quarters("m1", 4), [treble(), four_four()]),
                       measure("m2", quarters("m2", 4)),
                       measure("m3", quarters("m3", 2)),
                       measure("m4", quarters("m4", 2))])
     questions, unasked = build_questions(model, validate(model))
-    assert questions == [] and len(unasked) == 2
+    assert [q.code for q in questions] == ["measures_merge_suspicious"] and unasked == []
 
 
 # --- Clés ---------------------------------------------------------------------------------

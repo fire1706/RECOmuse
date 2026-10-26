@@ -17,6 +17,7 @@ même partie, corrigée par un autre membre de la fanfare.
 
 import json
 import sqlite3
+from dataclasses import asdict
 from pathlib import Path
 
 import cv2
@@ -25,7 +26,8 @@ import numpy as np
 from recomuse.importer.loading import read_gray
 from recomuse.learning.corrections import CorrectionError, CorrectionService, NewSymbol
 from recomuse.learning.journal import CorrectionJournal
-from recomuse.model.score import ScoreModel
+from recomuse.model.measures import Restructure
+from recomuse.model.score import ScoreModel, measure_from_dict
 from recomuse.model.store import load_model
 
 # Grille de l'empreinte : 16 × 16 comparaisons = 256 bits.
@@ -148,6 +150,15 @@ def replay_work(conn: sqlite3.Connection, service: CorrectionService, correction
     applied = skipped = 0
     for group in groups:
         model = load_model(conn, new_id)
+        if group[0]["symbol_kind"] == "measures":
+            # Deux mesures réunies, une mesure coupée : seulement sur les mêmes mesures.
+            done = _replay_measures(service, model, group[0], new_id, reason)
+            if done is None:
+                skipped += 1
+            else:
+                mapping[group[0]["id"]] = done
+                applied += 1
+            continue
         changes, removals, additions, order = [], [], [], ([], [], [])
         for c in group:
             if c["old_value"] is None:                    # ajout
@@ -199,6 +210,25 @@ def same_pages(stored: list[str], wanted: list[str]) -> bool:
     """Vrai si deux suites d'empreintes sont celles des mêmes pages, dans le même ordre."""
     return len(stored) == len(wanted) and all(
         distance(a, b) <= MAX_DISTANCE for a, b in zip(stored, wanted, strict=True))
+
+
+def _replay_measures(service: CorrectionService, model: ScoreModel, correction: dict,
+                     new_id: int, reason: str) -> int | None:
+    """Rejoue un changement de découpage en mesures, si les mesures d'alors sont là,
+    identiques. Renvoie le numéro de la reprise au journal, ou None."""
+    old, new = correction["old_value"], correction["new_value"]
+    part = next((p for p in model.parts if p.id == old["part_id"]), None)
+    current = part.measures[old["index"]:old["index"] + len(old["measures"])] if part else []
+    # Comparées en JSON, comme elles sont gardées au journal (les boîtes y sont des listes).
+    if json.loads(json.dumps([asdict(m) for m in current])) != old["measures"]:
+        return None
+    change = Restructure(old["part_id"], old["index"], current,
+                         [measure_from_dict(m) for m in new["measures"]],
+                         (correction["location"] or {}).get("measure_id") or current[0].id)
+    try:
+        return service.restructure(new_id, change, source="rule", reason=reason)
+    except CorrectionError:
+        return None
 
 
 def _value(model: ScoreModel, symbol_id: str | None) -> dict | None:

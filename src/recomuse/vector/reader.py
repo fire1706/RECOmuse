@@ -139,6 +139,9 @@ class Measure:
     measure_repeat: bool = False         # signe de répétition de la mesure précédente
     printed_number: int | None = None    # numéro de mesure imprimé
     symbols: list[str] = field(default_factory=list)  # nuances, articulations, coda...
+    # Nuances et articulations avec leur abscisse : (x, type, nom), pour les rattacher à la
+    # note la plus proche (model/from_vector.py).
+    placed_marks: list[tuple[float, str, str]] = field(default_factory=list)
     texts: list[str] = field(default_factory=list)
     marks: list[str] = field(default_factory=list)    # lettres de répétition (A, B, C...)
     expected_duration: Fraction | None = None   # durée d'après le chiffrage en vigueur
@@ -649,6 +652,8 @@ def _interpret_staff(content: StaffContent, state: dict, page: _Page) -> None:
         measure.measure_repeat = any(g.symbol and g.symbol.kind == "repeat" for g in glyphs)
         measure.symbols = [g.symbol.name for g in glyphs if g.symbol and g.symbol.kind in
                            ("dynamic", "articulation", "navigation", "tremolo")]
+        measure.placed_marks = [(g.x, g.symbol.kind, g.symbol.name) for g in glyphs
+                                if g.symbol and g.symbol.kind in ("dynamic", "articulation")]
 
     # Rappel de fin de ligne : pas une mesure.
     last = content.measures[-1] if content.measures else None

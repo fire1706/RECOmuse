@@ -106,7 +106,7 @@ describe('MeasureEditor', () => {
     expect(edit_score).toHaveBeenLastCalledWith(4, { op: 'time', measure_id: 'm12', beats: 3, beat_type: 4 })
     await screen.findByText('Mesure 12')
     fireEvent.change(screen.getByLabelText('Durée (mesures)'), { target: { value: '8' } })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Appliquer' })[1])
+    fireEvent.click(screen.getAllByRole('button', { name: 'Appliquer' })[2])
     expect(edit_score).toHaveBeenLastCalledWith(4, { op: 'multirest', measure_id: 'm12', count: 8 })
     await screen.findByText('Mesure 12')
     fireEvent.click(screen.getByRole('button', { name: 'Annuler ma dernière modification' }))
@@ -128,5 +128,52 @@ describe('MeasureEditor', () => {
     const label = symbolLabel(details.events[1], i18n.t, 'en')
     expect(label).toBe('C5, eighth note dotted')
     await act(() => i18n.changeLanguage('fr'))
+  })
+
+  it('règle le tempo de la mesure', async () => {
+    const { edit_score } = setup()
+    await screen.findByText('Mesure 12')
+    fireEvent.change(screen.getByLabelText('Allegro…'), { target: { value: 'Andante' } })
+    fireEvent.change(screen.getByLabelText('Noires par minute'), { target: { value: '76' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Appliquer' })[1])
+    expect(edit_score).toHaveBeenLastCalledWith(4, { op: 'tempo', measure_id: 'm12', text: 'Andante', per_minute: '76' })
+  })
+
+  it('réunit la mesure à la suivante, ou la coupe après la note choisie', async () => {
+    const { edit_score, onEdited } = setup('n1')
+    await screen.findByText('Mesure 12')
+    await click('Réunir avec la mesure suivante')
+    expect(edit_score).toHaveBeenLastCalledWith(4, { op: 'merge_next', measure_id: 'm12' })
+    expect(onEdited).toHaveBeenCalled()
+    await click('Couper la mesure après cette note')
+    expect(edit_score).toHaveBeenLastCalledWith(4, { op: 'split_after', symbol_id: 'n1' })
+  })
+
+  it('pose les signes d’expression sur la note choisie', async () => {
+    const { edit_score } = setup('n1')
+    await screen.findByText('Mesure 12')
+    await click('Staccato')
+    expect(edit_score).toHaveBeenLastCalledWith(4, { op: 'articulation', symbol_id: 'n1', name: 'staccato' })
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Nuance'), { target: { value: 'mf' } })
+    })
+    expect(edit_score).toHaveBeenLastCalledWith(4, { op: 'dynamic', symbol_id: 'n1', value: 'mf' })
+    await click('Début de liaison')
+    expect(edit_score).toHaveBeenLastCalledWith(4, { op: 'slur', symbol_id: 'n1', end: 'start' })
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Soufflet'), { target: { value: 'crescendo' } })
+    })
+    expect(edit_score).toHaveBeenLastCalledWith(4, { op: 'wedge', symbol_id: 'n1', value: 'crescendo' })
+    await click('Fin du soufflet')
+    expect(edit_score).toHaveBeenLastCalledWith(4, { op: 'wedge', symbol_id: 'n1', value: 'stop' })
+  })
+
+  it('explique pourquoi deux mesures ne se réunissent pas', async () => {
+    const api = fakeApi({ get_measure: async () => details, edit_score: async () => ({ error: 'merge_conflict' }) })
+    render(<MeasureEditor api={api} scoreId={4} measureId="m12" symbolId={null} version={0}
+      onSelectSymbol={vi.fn()} onSelectMeasure={vi.fn()} onEdited={vi.fn()} />)
+    await screen.findByText('Mesure 12')
+    await click('Réunir avec la mesure suivante')
+    expect(screen.getByText(/ce n'est sans doute pas une barre en trop/)).toBeInTheDocument()
   })
 })

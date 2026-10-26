@@ -19,13 +19,21 @@ L'historique des valeurs d'un symbole se lit dans le journal (history).
 import sqlite3
 import uuid
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 from recomuse import paths
 from recomuse.learning.journal import BoundingBox, Correction, CorrectionJournal, CorrectionSource
-from recomuse.model.score import VALUE_FIELDS, Measure, ScoreModel, Symbol, SymbolKind
+from recomuse.model.measures import Restructure
+from recomuse.model.score import (
+    VALUE_FIELDS,
+    Measure,
+    ScoreModel,
+    Symbol,
+    SymbolKind,
+    measure_from_dict,
+)
 from recomuse.model.snippets import crop_snippet
 from recomuse.model.store import load_model, save_model
 
@@ -33,7 +41,7 @@ from recomuse.model.store import load_model, save_model
 SYMBOL_SOURCE = {"question": "user", "manual": "user", "rule": "rule", "validator": "validator"}
 
 # Ordre des réglages en tête de mesure : un symbole ajouté y prend sa place.
-ATTRIBUTE_ORDER = ("clef", "key", "time", "multirest")
+ATTRIBUTE_ORDER = ("clef", "key", "time", "tempo", "multirest")
 # Symboles du contenu de la mesure (notes et silences, dans l'ordre de lecture).
 EVENT_KINDS = ("note", "rest")
 
@@ -142,6 +150,33 @@ class CorrectionService:
             save_model(self._conn, score_id, model, commit=False)
         return ids
 
+    def restructure(self, score_id: int, change: Restructure, source: CorrectionSource,
+                    reason: str | None = None) -> int:
+        """Change le découpage en mesures (deux mesures réunies, une mesure coupée en deux :
+        voir model/measures.py). Une seule correction au journal, de type « measures » :
+        les mesures d'avant et d'après, complètes, pour pouvoir l'annuler. Renvoie son
+        numéro."""
+        model = self._model(score_id)
+        part = next((p for p in model.parts if p.id == change.part_id), None)
+        current = part.measures[change.index:change.index + len(change.old)] if part else []
+        if [m.id for m in current] != [m.id for m in change.old]:
+            raise CorrectionError("Les mesures à remplacer ont changé entre-temps.")
+        first = change.old[0]
+        record = Correction(
+            score_id=score_id, page_number=first.page, measure_number=first.number,
+            symbol_id=first.id, symbol_kind="measures",
+            old_value=_measures_value(change.part_id, change.index, change.old),
+            new_value=_measures_value(change.part_id, change.index, change.new),
+            source=source, reason=reason,
+            location={"part_id": change.part_id, "index": change.index,
+                      "measure_id": change.selected})
+        with self._conn:
+            correction_id = self._journal.record(record, commit=False)
+            part.measures[change.index:change.index + len(change.old)] = change.new
+            model.refresh()
+            save_model(self._conn, score_id, model, commit=False)
+        return correction_id
+
     def revert(self, correction_id: int) -> int:
         """Annule une correction : le symbole reprend sa valeur d'avant (un symbole ajouté
         est retiré). Renvoie le numéro de l'annulation dans le journal (l'original y reste,
@@ -170,6 +205,10 @@ class CorrectionService:
         ids = []
         with self._conn:
             for original in reversed(originals):
+                if original.symbol_kind == "measures":    # découpage en mesures changé
+                    _swap_measures(model, original.new_value, original.old_value)
+                    ids.append(self._journal.revert(original.id, commit=False))
+                    continue
                 if original.new_value is None:      # c'était une suppression : on le remet
                     ids.append(self._journal.revert(original.id, commit=False))
                     self._restore(model, original)
@@ -332,3 +371,20 @@ def _correction(score_id: int, measure: Measure, symbol: Symbol, old: dict | Non
         alternatives=symbol.alternatives, source=source, group_id=group_id, reason=reason,
         location=location,
     )
+
+
+def _measures_value(part_id: str, index: int, measures: list[Measure]) -> dict:
+    """Mesures gardées au journal (fusion ou coupure de mesures), en JSON."""
+    return {"part_id": part_id, "index": index, "measures": [asdict(m) for m in measures]}
+
+
+def _swap_measures(model: ScoreModel, current: dict, wanted: dict) -> None:
+    """Remet le découpage `wanted` à la place de `current` (annulation)."""
+    part = next((p for p in model.parts if p.id == current["part_id"]), None)
+    start = current["index"]
+    present = [m.id for m in part.measures[start:start + len(current["measures"])]] \
+        if part else []
+    if present != [m["id"] for m in current["measures"]]:
+        raise CorrectionError("Les mesures ont changé depuis : impossible d'annuler.")
+    part.measures[start:start + len(current["measures"])] = [
+        measure_from_dict(m) for m in wanted["measures"]]
