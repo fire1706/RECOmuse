@@ -78,19 +78,39 @@ Le validateur doit détecter ces trois erreurs.
 ## Plan des tâches
 - [x] 0. Test de faisabilité
 - [x] 1. Cahier des charges
-- [ ] 2. Squelette du projet : structure, pyproject, fenêtre pywebview + React, base SQLite (dont le schéma du journal), tests
-- [ ] 3. Import et prétraitement
-- [ ] 4. Intégration d'Audiveris et lecture des textes
-- [ ] 4b. Lecture vectorielle directe des PDF vectoriels
-- [ ] 5. Modèle interne et journal des corrections
-- [ ] 6. Validateur musical
-- [ ] 7. Comparaison entre parties
-- [ ] 8. Interface de questions guidées
-- [ ] 9. Vue côte à côte et édition manuelle
-- [ ] 10. Instruments et transposition
-- [ ] 11. Exports MusicXML, MIDI, MuseScore
-- [ ] 12. Règles apprises et mémoire des partitions
-- [ ] 13. Packs d'apprentissage
-- [ ] 14. Conducteurs
-- [ ] 15. Installateurs Windows et macOS, tests sur le corpus réel
+- [x] 2. Squelette du projet : structure, pyproject, fenêtre pywebview + React, base SQLite (dont le schéma du journal), tests
+- [x] 3. Import et prétraitement
+- [x] 4. Intégration d'Audiveris et lecture des textes
+- [x] 4b. Lecture vectorielle directe des PDF vectoriels
+- [x] 5. Modèle interne et journal des corrections
+- [x] 6. Validateur musical
+- [x] 7. Comparaison entre parties
+- [x] 8. Interface de questions guidées
+- [x] 9. Vue côte à côte et édition manuelle
+- [x] 10. Instruments et transposition
+- [x] 11. Exports MusicXML, MIDI, MuseScore
+- [x] 12. Règles apprises et mémoire des partitions
+- [x] 13. Packs d'apprentissage
+- [x] 14. Conducteurs
+- [x] 15. Installateurs Windows et macOS, tests sur le corpus réel
 Plus tard : percussions, photos au téléphone, piano et chant, modèle entraîné sur les corrections.
+
+## État actuel (26 octobre 2026)
+Toutes les tâches du plan (2 à 15) sont codées et ont chacune leur commit (« etape N »).
+Corrections faites ensuite (24-26 octobre 2026) :
+- barre de progression de la lecture (page par page, temps restant, bouton Annuler) ;
+- nouveau design de l'interface à la manière de MuseScore 4 (onglets Accueil et Partition) ;
+- images de très basse résolution (< 120 dpi) passées en noir et blanc pur avant Audiveris ;
+- vérification mesure par mesure : questions dans l'ordre de la partition, chiffrages
+  manqués sur un passage, clés mal lues ;
+- avertissements de lecture par page, mesures vides, parties d'Audiveris associées à la
+  bonne portée (gros PDF de parties séparées) ;
+- signes d'expression (liaisons, articulations, nuances, soufflets, tempo) lus, édités,
+  rendus et exportés ; réunir ou couper des mesures.
+
+Reste à faire :
+- tester sur le corpus réel (`pytest -m corpus`, `scripts/corpus_report.py`) et corriger
+  ce qui en ressort ;
+- essayer les installateurs sur de vraies machines (Windows, Mac Intel et Apple) ;
+- `docs/cahier-des-charges.md` n'est pas dans le dépôt (resté sur l'ancien PC) : à récupérer ;
+- puis les idées « Plus tard ».
