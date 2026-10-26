@@ -32,7 +32,9 @@ gh release download "$AUDIVERIS_VERSION" --repo Audiveris/audiveris --pattern "$
     --dir build/download --clobber
 DMG="$(ls build/download/*.dmg | head -n 1)"
 MOUNT="$(mktemp -d)"
-hdiutil attach "$DMG" -nobrowse -mountpoint "$MOUNT"
+# L'image disque affiche la licence d'Audiveris (AGPL) à accepter : sans réponse,
+# hdiutil abandonne (« attach canceled »). « yes » répond oui à sa place.
+yes | hdiutil attach "$DMG" -nobrowse -mountpoint "$MOUNT" >/dev/null
 cp -R "$MOUNT/Audiveris.app" "$TOOLS/Audiveris.app"
 hdiutil detach "$MOUNT"
 
@@ -40,7 +42,10 @@ hdiutil detach "$MOUNT"
 brew install tesseract dylibbundler
 mkdir -p "$TOOLS/tesseract/bin" "$TOOLS/tesseract/lib"
 cp "$(brew --prefix tesseract)/bin/tesseract" "$TOOLS/tesseract/bin/"
+# -s : où chercher les bibliothèques ; sinon dylibbundler pose une question et, sans
+# personne pour répondre, la fabrication reste bloquée.
 dylibbundler -of -b -x "$TOOLS/tesseract/bin/tesseract" -d "$TOOLS/tesseract/lib" \
+    -s "$(brew --prefix)/lib" \
     -p @executable_path/../lib
 
 # Langues de Tesseract : la version « tessdata » standard (celle qu'Audiveris sait lire).

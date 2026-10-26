@@ -17,8 +17,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macos-14 : puces Apple (arm64) ; macos-13 : puces Intel (x86_64).
-        runner: [macos-14, macos-13]
+        # macos-14 : puces Apple (arm64) ; macos-15-intel : puces Intel (x86_64).
+        # (GitHub a retiré macos-13 : une tâche qui le demande reste en attente sans fin.)
+        runner: [macos-14, macos-15-intel]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4

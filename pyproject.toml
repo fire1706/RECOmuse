@@ -12,7 +12,10 @@ requires-python = ">=3.12,<3.13"
 authors = [{ name = "Fanfare Royale d'Acoz" }]
 dependencies = [
     "pywebview>=5.3",
-    "pymupdf>=1.24",
+    # PyMuPDF 2.0 n'existe pas précompilé pour les Mac Intel (pip essaierait de le compiler
+    # et échouerait) : ces Mac restent sur la version 1.x.
+    "pymupdf>=1.24; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "pymupdf>=1.24,<2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
     "opencv-python-headless>=4.10",
     "numpy>=2.0",
 ]
