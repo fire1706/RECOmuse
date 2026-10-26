@@ -24,7 +24,16 @@ if not (UI / "index.html").is_file():
 if not TOOLS.is_dir():
     raise SystemExit("Outils absents : lancer packaging/prepare_tools.py.")
 
-datas = [(str(UI), "ui"), (str(TOOLS), "tools")]
+datas = [(str(UI), "ui")]
+if sys.platform == "darwin":
+    # macOS : PyInstaller découperait Audiveris.app (renommé « Audiveris__dot__app »,
+    # réparti entre Frameworks et Resources), ce qui casse sa signature : macOS dirait
+    # alors que RECOmuse est « endommagé ». Audiveris.app est donc copié intact après
+    # coup par packaging/build_macos.sh ; ici, seulement les autres outils.
+    datas += [(str(item), f"tools/{item.name}") for item in TOOLS.iterdir()
+              if item.name != "Audiveris.app"]
+else:
+    datas += [(str(TOOLS), "tools")]
 datas += collect_data_files("recomuse")
 
 a = Analysis(

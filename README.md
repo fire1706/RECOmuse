@@ -94,8 +94,11 @@ l'utilisateur (`%LOCALAPPDATA%\RECOmuse` : base, ce que le logiciel a appris).
 macOS : le workflow GitHub Actions « Application macOS » (`.github/workflows/build-macos.yml`)
 fabrique un .dmg pour les puces Apple et pour les puces Intel, à la main depuis l'onglet
 Actions ou en poussant une étiquette `v*`. Sur un Mac, `sh packaging/build_macos.sh` fait de
-même. L'application n'est pas signée : au premier lancement, clic droit sur RECOmuse puis
-« Ouvrir ».
+même. L'application n'a pas de certificat Apple (signature « ad hoc » seulement) : au
+premier lancement, glisser RECOmuse dans Applications et l'ouvrir ; macOS refuse une
+première fois. Puis Réglages Système → Confidentialité et sécurité → « Ouvrir quand même »
+(macOS 15 et suivants ; sur les versions plus anciennes : clic droit sur RECOmuse puis
+« Ouvrir »).
 
 Le journal du logiciel installé est `recomuse.log`, dans le dossier des données.
 

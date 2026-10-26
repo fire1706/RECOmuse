@@ -7,7 +7,7 @@
 #
 # Prérequis : Python 3.12 (avec le .venv du projet et PyInstaller), Node.js, Homebrew,
 # et l'outil « gh » (GitHub) connecté, pour télécharger Audiveris.
-# L'application n'est pas signée : au premier lancement, clic droit → Ouvrir.
+# Application sans certificat Apple (signature « ad hoc ») : voir le README pour l'ouvrir.
 set -eu
 
 AUDIVERIS_VERSION="${AUDIVERIS_VERSION:-5.11.0}"
@@ -57,6 +57,15 @@ done
 echo "== PyInstaller"
 python3 -m PyInstaller packaging/recomuse.spec --noconfirm --distpath dist \
     --workpath build/pyinstaller
+
+echo "== Audiveris et signature"
+# Audiveris.app est copié intact (voir packaging/recomuse.spec) dans le dossier où
+# RECOmuse cherche ses outils (sys._MEIPASS/tools = Contents/Frameworks/tools).
+ditto "$TOOLS/Audiveris.app" dist/RECOmuse.app/Contents/Frameworks/tools/Audiveris.app
+# Signature « ad hoc » (sans certificat Apple) de toute l'application : sans signature
+# valide, macOS dit que l'application est « endommagée » au lieu de proposer de l'ouvrir.
+codesign --force --deep --sign - dist/RECOmuse.app
+codesign --verify --deep --strict dist/RECOmuse.app
 
 echo "== Image disque"
 DMG_OUT="dist/RECOmuse-$VERSION-macos-$ARCH.dmg"

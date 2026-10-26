@@ -4,7 +4,7 @@
 # - à la main, depuis l'onglet « Actions » de GitHub (bouton « Run workflow ») ;
 # - quand une étiquette de version est poussée (git tag v0.1.0 puis git push --tags).
 # Les .dmg sont à télécharger en bas de la page de l'exécution (« Artifacts »).
-# L'application n'est pas signée : au premier lancement, clic droit → Ouvrir.
+# Application sans certificat Apple (signature « ad hoc ») : voir le README pour l'ouvrir.
 name: Application macOS
 
 on:
